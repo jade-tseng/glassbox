@@ -242,7 +242,7 @@ Ambient loops (signal grid, orbit, scanline) are only for the landing page and e
 
 ### Hero (instrument)
 - Left: display-size name or a one-line descriptor (≤8 words, period), then a mono label row (`SAMPLE RUN · 12 events · 00:41`).
-- Right or below: the **instrument frame**, a 6px-radius panel on scope holding a miniature `BeliefGraph` replaying a real run (`runs/bg2` as the SAMPLE source), with `Scanline`, and a `CountUp` row (`read_rows 20.0M → 1.32M`, hypotheses, refuted, gate blocks). It replaces the event log.
+- Right or below: the **instrument frame**, a 6px-radius panel on scope replaying a real run (`runs/bg2`, labeled `REPLAY`). It holds a `Scanline`, a `CountUp` of best `read_rows` (from 20,000,000), the metric staircase, and a `CountUp` row (hypotheses, experiments, refuted). It replaces the event log. Implemented in `components/belief/RunSummary.tsx`.
 - Background: `SignalGrid`.
 - **No buttons, no "✓ no setup required" rows, no subheading pitch.**
 
@@ -274,15 +274,16 @@ Mono label (12px, muted) → `CountUp` value (mono 32–40px) → delta (12px mo
 - Tabs are mono 12px uppercase. The active tab has a 1px ink underline, which slides between tabs (`--dur-base`).
 
 ### Belief graph (signature component)
-The centerpiece, implemented with `@xyflow/react` + ELK, with custom node and edge components only (no default xyflow styles).
+The centerpiece. The landing page uses a hand-laid SVG version (`components/belief/BeliefGraph.tsx`): stable lanes computed from the full run, the biggest topic as a grid in the middle. The app view may use `@xyflow/react` + ELK with custom nodes only. Both read the shared engine (`lib/beliefEngine.ts`).
 - **Topic hull:** a rounded 12px region with a 1px line in the topic color at 40% opacity, a 4% topic-color fill, and a mono uppercase topic label at top-left with counts (`PROJECTIONS · 7 · 2 refuted`). Collapsed by default when it has more than 4 hypotheses (PLAN §7: clutter). It expands to a fan.
 - **Hypothesis card (220×~76):** scope-raised, 6px radius, 2px topic-color left bar.
   - Row 1: mono id + status chip (`H6 · REFUTED`).
   - Row 2: claim, 13px sans, 2 lines max.
   - Row 3: the **prediction-vs-belief bar**. A 4px track with a dashed tick at the stated prior (the prediction) and a solid fill at the current posterior. The gap between tick and fill is the story: was the agent over- or under-confident? The number is mono on the right (`0.50 → 0.08`).
-- **Experiment dots (10px):** these orbit the bottom edge of their hypothesis card in seq order. They're filled or hollow per §2.5, and an edge to the card is colored by its evidence type. Hovering shows a tooltip with `E6 · read_rows 2.31M → 2.31M (0%) · correct · discarded`.
+- **Experiment dots (8px):** these sit in a row at the bottom-right of their hypothesis card, in seq order, so they can fly to and from the Before chart. They're filled or hollow per §2.5, and an edge to the card is colored by its evidence type. Hovering shows a tooltip with `E6 · read_rows 2.31M → 2.31M (0%) · correct · discarded`.
 - **Cross-links:** curved, labeled in mono 10px at the midpoint on a scope-colored backing so the label stays legible. Real runs have few explicit links, so also draw an **implicit `same region` link** (1px dotted, no label until hover) between hypotheses that share a `code_region.symbol` (e.g. H6 ↔ H9 on `PROJECTION p_src`). It makes "learned from a failure" visible.
 - **Focus:** clicking a card dims everything except its evidence, links and topic. The ledger scrolls to it.
+- **Tension:** an amber corner triangle marks a hypothesis the agent closed as *confirmed* while the measured evidence doesn't back it (belief < 0.5, or no supporting experiment). In `bg2` this flags H16 and H17. It's the closest thing to a reward-hacking signal we show, so keep it visible.
 - **Query citations:** cited nodes get the signal ring and a numbered chip matching `[1]` in the answer. The canvas pans and zooms to fit them (400ms, `--ease-in-out`).
 
 ### Belief timeline + scrubber

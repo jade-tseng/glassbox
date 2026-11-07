@@ -103,6 +103,23 @@ h1, h2, h3, h4 {
   from { opacity: 0; transform: translateY(-8px); }
   to { opacity: 1; transform: none; }
 }
+@keyframes node-flash {
+  from { stroke: var(--color-live); stroke-opacity: 1; }
+  to { stroke: var(--color-live); stroke-opacity: 0; }
+}
+.anim-node-flash { animation: node-flash 1.2s var(--ease-out) both; stroke-width: 1.5; }
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(8px); }
+}
+.anim-card-in { animation: card-in 600ms var(--ease-out) both; transform-box: fill-box; }
+@keyframes ring {
+  0% { r: 4; opacity: 1; }
+  100% { r: 14; opacity: 0; }
+}
+.anim-ring { animation: ring 1.2s var(--ease-out) 3 both; }
+@keyframes fade-in {
+  from { opacity: 0; }
+}
 @keyframes edge-settle {
   from { background-color: var(--color-live); }
   to { background-color: var(--edge, var(--color-slate)); }
@@ -167,10 +184,10 @@ h1, h2, h3, h4 {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .anim-pulse, .anim-scan, .anim-marquee, .anim-caret, .anim-orbit, .anim-shimmer, .anim-shake {
+  .anim-pulse, .anim-scan, .anim-marquee, .anim-caret, .anim-orbit, .anim-shimmer, .anim-shake, .anim-card-in, .anim-ring, .anim-node-flash {
     animation: none !important;
   }
-  .anim-row-in { animation: row-in 150ms linear both; transform: none; }
+  .anim-row-in { animation: fade-in 150ms linear both; }
   .reveal { transform: none; filter: none; transition: opacity 150ms linear; }
   .bar-grow { transition: none; }
 }

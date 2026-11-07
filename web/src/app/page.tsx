@@ -1,147 +1,137 @@
-// Placeholder landing page. Styling follows /UI.md.
+// Glassbox live specimen. Styling and motion follow /UI.md (v3). All belief data is a REPLAY of runs/bg2,
+// pushed through the same belief engine as the /run view.
 
-const PALETTE = ["#F2C247", "#D14F35", "#BDDDD0", "#E599BB", "#E9C1AC", "#F5F2EC"];
+import Link from "next/link";
+import { BeliefSection } from "@/components/belief/BeliefSection";
+import { ReplayProvider } from "@/components/belief/Replay";
+import { Calibration, HeroInstrument, HypothesisMarquee, RegionImpact } from "@/components/belief/RunSummary";
+import { GlassCube } from "@/components/motion/GlassCube";
+import { Orbit } from "@/components/motion/Orbit";
+import { PulseDot, Reveal } from "@/components/motion/primitives";
+import { SignalGrid } from "@/components/motion/SignalGrid";
 
-function BlockTerrain() {
-  // Original flat "token brick" field: cells colored by a simple height map.
-  const cols = 30;
-  const rows = 6;
-  const w = 48;
-  const h = 28;
-  const cells = [];
-  for (let c = 0; c < cols; c++) {
-    const height = Math.round(3 + 2.5 * Math.sin(c / 3) + 1.5 * Math.cos(c / 1.7));
-    for (let r = 0; r < rows; r++) {
-      if (rows - r > height) continue;
-      const color = PALETTE[(Math.floor(c / 4) + r) % PALETTE.length];
-      cells.push(
-        <rect
-          key={`${c}-${r}`}
-          x={c * w}
-          y={r * h}
-          width={w}
-          height={h}
-          fill={color}
-          stroke="#202020"
-          strokeWidth={1}
-        />,
-      );
-    }
-  }
+const label = "font-mono text-[12px] uppercase tracking-[0.08em] text-muted";
+const h2 = "text-[24px] font-medium leading-[1.15] tracking-[-0.025em] md:text-[28px]";
+
+function SectionLabel({ n, children, dark = false }: { n: string; children: string; dark?: boolean }) {
   return (
-    <svg
-      viewBox={`0 0 ${cols * w} ${rows * h}`}
-      className="block w-full"
-      preserveAspectRatio="xMidYMax slice"
-      aria-hidden
-    >
-      {cells}
-    </svg>
+    <p className={`font-mono text-[12px] uppercase tracking-[0.08em] ${dark ? "text-scope-muted" : "text-muted"}`}>
+      {n} / {children}
+    </p>
   );
 }
 
-const STATS = [
-  { value: "01", label: "Day to build" },
-  { value: "$0", label: "Spent so far" },
-  { value: "∞", label: "Ideas in the backlog" },
-  { value: "<24h", label: "Until demo" },
-];
-
 export default function Home() {
   return (
-    <div className="flex min-h-full flex-col">
-      {/* Nav */}
-      <header className="sticky top-0 z-10 border-b border-stone bg-cream">
-        <nav className="mx-auto flex h-14 max-w-[1200px] items-center justify-between px-4 md:px-10">
-          <span className="flex items-center gap-2 text-[20px] font-medium tracking-[-0.02em]">
-            <span className="inline-block h-3 w-3 bg-ink" aria-hidden />
-            glassbox
-          </span>
-          <div className="hidden gap-8 text-sm md:flex">
-            <a href="#features" className="hover:underline">Features</a>
-            <a href="#results" className="hover:underline">Results</a>
-          </div>
-          <a
-            href="#"
-            className="inline-flex h-[30px] items-center rounded-full bg-ink px-4 text-sm text-cream transition-colors hover:bg-black"
-          >
-            Get started
-          </a>
-        </nav>
-      </header>
+    <ReplayProvider>
+      <div className="flex min-h-full flex-col">
+        {/* Nav */}
+        <header className="sticky top-0 z-20 border-b border-line bg-frost/85 backdrop-blur-md">
+          <nav className="mx-auto flex h-14 max-w-[1200px] items-center justify-between px-4 md:px-10">
+            <span className="flex items-center gap-2 text-[18px] font-medium tracking-[-0.02em]">
+              <GlassCube size={18} />
+              glassbox
+            </span>
+            <div className="hidden gap-6 font-mono text-[12px] uppercase tracking-[0.08em] text-muted md:flex">
+              <a href="#beliefs" className="transition-colors duration-150 hover:text-signal">Beliefs</a>
+              <a href="#impact" className="transition-colors duration-150 hover:text-signal">Impact</a>
+              <a href="#loop" className="transition-colors duration-150 hover:text-signal">Loop</a>
+              <Link href="/run/bg2" className="transition-colors duration-150 hover:text-signal">Run view</Link>
+            </div>
+            <span className="flex items-center gap-2 font-mono text-[12px] uppercase tracking-[0.08em]">
+              <PulseDot />
+              Replay · bg2
+            </span>
+          </nav>
+        </header>
 
-      {/* Hero */}
-      <section className="bg-gradient-to-b from-sand to-white">
-        <div className="mx-auto max-w-[1200px] px-4 pt-20 pb-16 md:px-10 md:pt-28">
-          <h1 className="max-w-[620px] text-[36px] leading-none tracking-[-0.02em] md:text-[50px]">
-            Something great is being built here today.
-          </h1>
-          <p className="mt-6 max-w-[520px] text-base text-ink">
-            This is the placeholder for the Glassbox demo. Specs are on the way.
-          </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <a
-              href="#"
-              className="inline-flex h-12 items-center rounded-full bg-ink px-7 text-base text-cream transition-colors hover:bg-black"
-            >
-              Get started
-            </a>
-            <a
-              href="#"
-              className="inline-flex h-12 items-center rounded-full border border-ink bg-white px-7 text-base transition-colors hover:bg-sand"
-            >
-              Book demo
-            </a>
+        {/* Hero / instrument */}
+        <section className="relative overflow-hidden border-b border-line">
+          <SignalGrid className="absolute inset-0" />
+          <div className="relative mx-auto grid max-w-[1200px] grid-cols-[minmax(0,1fr)] items-center gap-10 px-4 py-14 md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] md:px-10 md:py-24">
+            <Reveal>
+              <h1 className="max-w-[480px] text-[32px] font-medium leading-[1.05] tracking-[-0.03em] md:text-[44px]">
+                What the agent believed, and why.
+              </h1>
+              <p className={`mt-6 ${label}`}>Prediction first · harness measures · belief updates</p>
+            </Reveal>
+            <Reveal index={2}>
+              <HeroInstrument />
+            </Reveal>
           </div>
-          <ul className="mt-5 flex gap-6 text-sm">
-            <li><span className="text-emerald">✓</span> Built in one day</li>
-            <li><span className="text-emerald">✓</span> Deployed on Vercel</li>
-          </ul>
+        </section>
+
+        {/* 01 Beliefs — the scope band */}
+        <section id="beliefs" className="relative bg-scope px-4 py-14 text-scope-text md:px-10 md:py-24">
+          <div className="mx-auto max-w-[1200px]">
+            <Reveal>
+              <SectionLabel n="01" dark>Beliefs</SectionLabel>
+              <h2 className={`mt-4 ${h2}`}>Every result, measured against its prediction.</h2>
+            </Reveal>
+            <Reveal index={2} className="mt-10">
+              <BeliefSection />
+            </Reveal>
+          </div>
+        </section>
+
+        {/* 02 Impact */}
+        <section id="impact" className="bg-frost px-4 py-14 md:px-10 md:py-24">
+          <div className="mx-auto max-w-[1200px]">
+            <Reveal>
+              <SectionLabel n="02">Impact</SectionLabel>
+              <h2 className={`mt-4 ${h2}`}>Where in the schema it mattered.</h2>
+            </Reveal>
+            <div className="mt-10 grid gap-px overflow-hidden rounded-[6px] border border-line bg-line md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+              <Reveal className="bg-white p-5 md:p-6">
+                <div className="flex items-center justify-between">
+                  <p className={label}>Rows saved by code region</p>
+                  <PulseDot size={6} />
+                </div>
+                <div className="mt-4">
+                  <RegionImpact />
+                </div>
+              </Reveal>
+              <Reveal index={1} className="bg-white p-5 md:p-6">
+                <div className="flex items-center justify-between">
+                  <p className={label}>Calibration</p>
+                  <PulseDot size={6} />
+                </div>
+                <div className="mt-6">
+                  <Calibration />
+                </div>
+              </Reveal>
+            </div>
+          </div>
+        </section>
+
+        {/* 03 Loop */}
+        <section id="loop" className="border-t border-line bg-white px-4 py-14 md:px-10 md:py-24">
+          <div className="mx-auto grid max-w-[1200px] grid-cols-[minmax(0,1fr)] items-center gap-10 md:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
+            <Reveal>
+              <SectionLabel n="03">Loop</SectionLabel>
+              <h2 className={`mt-4 ${h2}`}>No measurement without a prediction.</h2>
+            </Reveal>
+            <Reveal index={2}>
+              <Orbit />
+            </Reveal>
+          </div>
+        </section>
+
+        {/* Every hypothesis the run considered */}
+        <div className="border-y border-line bg-frost py-4">
+          <HypothesisMarquee />
         </div>
-        <BlockTerrain />
-      </section>
 
-      {/* Features */}
-      <section id="features" className="bg-white px-4 py-12 md:px-10 md:py-20">
-        <div className="mx-auto max-w-[1200px]">
-          <h2 className="max-w-[800px] text-[28px] leading-[1.15] tracking-[-0.035em]">
-            Observe. <span className="text-muted">See what is happening, what it costs, and where the value is.</span>
-          </h2>
-          <ul className="mt-10 border-t border-stone">
-            {["Feature one", "Feature two", "Feature three", "And more"].map((f) => (
-              <li key={f} className="border-b border-stone py-3">{f}</li>
-            ))}
-          </ul>
-        </div>
-      </section>
-
-      {/* Results (accent section) */}
-      <section id="results" className="bg-accent text-cream">
-        <div className="mx-auto max-w-[1200px]">
-          <div className="max-w-[640px] p-4 py-10 md:p-10">
-            <p className="text-sm uppercase tracking-[0.14em] text-cream/70">Results</p>
-            <h2 className="mt-4 text-[28px] leading-[1.15] tracking-[-0.035em] md:text-[35px]">
-              What we will have by the end of the day.
-            </h2>
+        {/* Footer */}
+        <footer className="mt-auto bg-frost px-4 py-8 md:px-10">
+          <div className={`mx-auto flex max-w-[1200px] items-center justify-between ${label}`}>
+            <span className="flex items-center gap-2 normal-case tracking-normal text-ink">
+              <GlassCube size={14} /> glassbox
+            </span>
+            <span>Nov 2026 · replay of run bg2</span>
           </div>
-          <div className="grid grid-cols-2 border-t border-cream/20">
-            {STATS.map((s, i) => (
-              <div
-                key={s.label}
-                className={`border-b border-cream/20 p-4 py-8 md:p-10 ${i % 2 === 0 ? "border-r" : ""}`}
-              >
-                <div className="num text-[30px] tracking-[-0.03em] md:text-[37px]">{s.value}</div>
-                <div className="mt-2 text-cream/85">{s.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="mt-auto border-t border-stone bg-cream px-4 py-10 text-sm text-muted md:px-10">
-        <div className="mx-auto max-w-[1200px]">Glassbox · Nov 2026</div>
-      </footer>
-    </div>
+        </footer>
+      </div>
+    </ReplayProvider>
   );
 }
