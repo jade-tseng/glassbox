@@ -7,7 +7,7 @@ import type { ExperimentNode, GraphState, HypothesisNode } from "./beliefEngine"
 export const INTENTS = {
   why_stopped: "Why the agent gave up on, refuted, abandoned or reverted an idea",
   belief_about: "What the agent currently believes about a topic or idea, and how confident it is",
-  what_worked: "What worked: the changes that reduced read_rows the most",
+  what_worked: "What worked: the changes that improved the metric the most",
   what_failed: "What failed: refuted hypotheses, discarded or invalid experiments, wrong results",
   evidence_for: "The evidence behind a specific hypothesis or experiment",
   calibration: "How well the agent's predictions matched outcomes; where it was surprised",
@@ -22,26 +22,26 @@ const pct = (x: number) => `${Math.round(x * 100)}%`;
 export const rows = (n: number | null) =>
   n === null ? "n/a" : n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : String(n);
 
-function expLine(e: ExperimentNode): string {
+function expLine(e: ExperimentNode, metric: string): string {
   if (!e.correct) return `${e.id}: ${e.errorKind}${e.errorMessage ? ` (${e.errorMessage.slice(0, 140)})` : ""}`;
-  const rel = e.relChange === null ? "" : ` (${e.relChange >= 0 ? "−" : "+"}${Math.abs(e.relChange * 100).toFixed(1)}%)`;
-  return `${e.id}: read_rows ${rows(e.metricBefore)} → ${rows(e.metricAfter)}${rel}, ${e.outcome}`;
+  const rel = e.rawChange === null ? "" : ` (${e.rawChange <= 0 ? "−" : "+"}${Math.abs(e.rawChange * 100).toFixed(1)}%)`;
+  return `${e.id}: ${metric} ${rows(e.metricBefore)} → ${rows(e.metricAfter)}${rel}, ${e.outcome}`;
 }
 
 function hypItem(h: HypothesisNode, g: GraphState, relevance: number): AnswerItem {
   const exps = h.tests.map((id) => g.experiments.find((e) => e.id === id)).filter(Boolean) as ExperimentNode[];
   const lines = [
     `Claim: ${h.claim}`,
-    `Status ${h.status}; confidence ${pct(h.prediction.confidence)} stated → ${pct(h.confidence)} after evidence (predicted read_rows ${h.prediction.direction}).`,
+    `Status ${h.status}; confidence ${pct(h.prediction.confidence)} stated → ${pct(h.confidence)} after evidence (predicted ${g.task.metric.label} ${h.prediction.direction.replace("_", " ")}).`,
     `Why the agent thought so: ${h.reason}`,
-    ...exps.map((e) => `${expLine(e)}${e.note ? ` — agent: “${e.note}”` : ""}`),
+    ...exps.map((e) => `${expLine(e, g.task.metric.label)}${e.note ? ` — agent: “${e.note}”` : ""}`),
   ];
   if (h.summary) lines.push(`Closing summary: “${h.summary}”`);
   return { id: h.id, kind: "hypothesis", title: `${h.id} · ${h.topic}`, lines, relevance };
 }
 
-function expItem(e: ExperimentNode, relevance: number): AnswerItem {
-  const lines = [expLine(e), `Tested: ${e.hypothesisIds.join(", ") || "no armed hypothesis"}; files: ${e.filesChanged.join(", ") || "none"}.`];
+function expItem(e: ExperimentNode, relevance: number, metric: string): AnswerItem {
+  const lines = [expLine(e, metric), `Tested: ${e.hypothesisIds.join(", ") || "no armed hypothesis"}; files: ${e.filesChanged.join(", ") || "none"}.`];
   if (e.note) lines.push(`Agent: “${e.note}”`);
   if (e.disagreement) lines.push(`Note: the agent's keep decision (${e.agentKept}) disagrees with the harness (beats best: ${e.beatsBest}).`);
   return { id: e.id, kind: "experiment", title: `${e.id} · ${e.outcome}`, lines, relevance };
@@ -61,7 +61,7 @@ export function compose(g: GraphState, intent: Intent, focus: string | null, rel
   const covered = new Set(selected.flatMap((h) => h.tests));
   const exps = g.experiments.filter((e) => (rel[e.id] ?? 0) >= threshold && !covered.has(e.id)).slice(0, 3);
 
-  const items = [...selected.map((h) => hypItem(h, g, rel[h.id] ?? 1)), ...exps.map((e) => expItem(e, rel[e.id] ?? 0))];
+  const items = [...selected.map((h) => hypItem(h, g, rel[h.id] ?? 1)), ...exps.map((e) => expItem(e, rel[e.id] ?? 0, g.task.metric.label))];
   const cited = [...new Set([...items.map((i) => i.id), ...selected.flatMap((h) => h.tests)])];
   return { lead: lead(g, intent, selected, exps), items, cited, intent, focus };
 }
@@ -85,8 +85,8 @@ function lead(g: GraphState, intent: Intent, hs: HypothesisNode[], es: Experimen
     case "what_worked": {
       const wins = hs.filter((h) => bestGain(h, g) > 0.01);
       return wins.length
-        ? `${wins.length} idea${wins.length > 1 ? "s" : ""} moved the metric; biggest: ${wins[0].id} (−${(bestGain(wins[0], g) * 100).toFixed(1)}% read_rows in one step).`
-        : "None of the relevant ideas reduced read_rows meaningfully.";
+        ? `${wins.length} idea${wins.length > 1 ? "s" : ""} moved the metric; biggest: ${wins[0].id} (${(bestGain(wins[0], g) * 100).toFixed(1)}% better ${g.task.metric.label} in one step).`
+        : `None of the relevant ideas improved ${g.task.metric.label} meaningfully.`;
     }
     case "what_failed":
       return `${refuted.length} refuted or abandoned, ${es.filter((e) => e.outcome !== "kept").length} other failed or discarded experiments among the evidence.`;
@@ -95,7 +95,7 @@ function lead(g: GraphState, intent: Intent, hs: HypothesisNode[], es: Experimen
     case "evidence_for":
       return `Evidence for ${hs.map((h) => h.id).concat(es.map((e) => e.id)).join(", ")}, as measured by the harness.`;
     default:
-      return `Best read_rows ${rows(g.metric.best)} vs baseline ${rows(g.metric.baseline)} after ${g.experiments.length} experiments and ${Object.keys(g.hypotheses).length} hypotheses.`;
+      return `${g.task.name}: best ${g.task.metric.label} ${rows(g.metric.best)} vs baseline ${rows(g.metric.baseline)} after ${g.experiments.length} experiments and ${Object.keys(g.hypotheses).length} hypotheses.`;
   }
 }
 

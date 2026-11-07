@@ -9,7 +9,7 @@ import { HeatmapView } from "./HeatmapView";
 import { Ledger } from "./Ledger";
 import { QueryBox } from "./QueryBox";
 import { Timeline } from "./Timeline";
-import { CountUp, Label, PulseDot, fmtRows } from "./ui";
+import { CountUp, Label, PulseDot, fmtNum } from "./ui";
 import { useRunEvents } from "./useRunEvents";
 
 type Tab = "graph" | "heatmap" | "before";
@@ -44,7 +44,11 @@ export function RunView({ runId }: { runId: string }) {
 
   const exps = graph.experiments;
   const hs = Object.values(graph.hypotheses);
-  const reduction = graph.metric.baseline && graph.metric.best ? 1 - graph.metric.best / graph.metric.baseline : null;
+  const lowerIsBetter = graph.task.metric.direction !== "higher";
+  const reduction =
+    graph.metric.baseline && graph.metric.best !== null
+      ? (lowerIsBetter ? graph.metric.baseline - graph.metric.best : graph.metric.best - graph.metric.baseline) / Math.abs(graph.metric.baseline)
+      : null;
   const lastMessage = graph.messages.at(-1);
 
   return (
@@ -70,17 +74,20 @@ export function RunView({ runId }: { runId: string }) {
       <section className="mx-auto max-w-[1440px] px-4 pt-8 md:px-10">
         <Label>01 / Run</Label>
         <h1 className="mt-2 text-[32px] font-medium leading-[1.05] tracking-[-0.03em] md:text-[44px]">What the agent believed.</h1>
-        <p className="mt-2 font-mono text-[12px] text-muted">
-          Claude Code autoresearch · ClickBench hits (2M rows) on ClickHouse · metric total read_rows (lower is better)
+        <p className={`mt-2 font-mono text-[12px] text-muted ${graph.seq === 0 ? "invisible" : ""}`}>
+          {graph.task.agent}
+          {graph.task.provider ? ` on ${graph.task.provider}` : ""}
+          {graph.task.model ? ` (${graph.task.model})` : ""} · {graph.task.name} · metric {graph.task.metric.label} ({graph.task.metric.direction} is better)
         </p>
+        {graph.task.description && <p className="mt-1 max-w-[760px] text-[14px] leading-[20px] text-muted">{graph.task.description}</p>}
 
         <div className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-[6px] border border-line bg-line md:grid-cols-6">
-          <Tile label="Baseline" value={<CountUp value={graph.metric.baseline} format={(n) => fmtRows(Math.round(n))} />} />
-          <Tile label="Best" value={<CountUp value={graph.metric.best} format={(n) => fmtRows(Math.round(n))} />} live={running} />
+          <Tile label="Baseline" value={<CountUp value={graph.metric.baseline} format={fmtNum} />} sub={<span>{graph.task.metric.unit || graph.task.metric.label}</span>} />
+          <Tile label="Best" value={<CountUp value={graph.metric.best} format={fmtNum} />} live={running} sub={<span>{graph.task.metric.unit || graph.task.metric.label}</span>} />
           <Tile
-            label="Reduction"
+            label="Improvement"
             value={<CountUp value={reduction === null ? null : reduction * 100} format={(n) => `${n.toFixed(1)}%`} />}
-            sub={reduction ? <span className="text-success">↓ rows read</span> : null}
+            sub={reduction ? <span className="text-success">{lowerIsBetter ? "↓" : "↑"} {graph.task.metric.label}</span> : null}
           />
           <Tile
             label="Experiments"

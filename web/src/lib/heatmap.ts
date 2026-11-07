@@ -1,8 +1,6 @@
-// Code heatmap model (PLAN §4.7). Pure function over a (scrubber-scoped) GraphState.
-// - touches: experiments whose diff changed the file / tested a hypothesis aimed at the region
-// - impact:  read_rows saved by KEPT experiments (before - after), split evenly across the files (or
-//            hypotheses) involved
-// - queries: per-query read_rows baseline -> current best, and which kept experiments moved each query
+// Code heatmap model (PLAN §4.7). Pure function over a (scrubber-scoped) GraphState. Target-agnostic:
+// files come from the run's declared editable files and the diffs; regions from the agent's code_region;
+// "impact" = metric improvement from KEPT experiments (respecting whether lower or higher is better).
 
 import type { GraphState } from "./beliefEngine";
 
@@ -16,6 +14,8 @@ export type RegionHeat = {
   hypotheses: string[];
 };
 
+export type ComponentHeat = { name: string; baseline: number; current: number; movedBy: { experiment: string; improvement: number }[] };
+
 export type FileHeat = {
   file: string;
   touches: number;
@@ -23,55 +23,67 @@ export type FileHeat = {
   impact: number;
   experiments: string[];
   regions: RegionHeat[];
-  query: { name: string; baseline: number; current: number; movedBy: { experiment: string; saved: number }[] } | null;
+  component: ComponentHeat | null; // breakdown component that maps to this file, if the target says so
 };
 
-export type Heatmap = { files: FileHeat[]; maxImpact: number; totalSaved: number };
-
-const normFile = (f: string) => {
-  const s = (f || "").trim().replace(/^\.\//, "");
-  if (!s) return "schema.sql";
-  if (s.endsWith("schema.sql")) return "schema.sql";
-  const m = s.match(/(q\d+[\w-]*)\.sql$/);
-  return m ? `queries/${m[1]}.sql` : s;
+export type Heatmap = {
+  files: FileHeat[];
+  unmappedComponents: ComponentHeat[]; // breakdown components with no file of their own
+  maxImpact: number;
+  totalImprovement: number;
 };
+
+const clean = (f: string) => (f || "").trim().replace(/^\.\//, "");
 const normSymbol = (s: string) => (s || "unspecified").trim().replace(/\s+/g, " ");
 
 export function buildHeatmap(g: GraphState): Heatmap {
+  const lowerIsBetter = g.task.metric.direction !== "higher";
+  const improvement = (before: number, after: number) => Math.max(0, lowerIsBetter ? before - after : after - before);
+
   const files = new Map<string, FileHeat>();
   const ensure = (file: string): FileHeat => {
     let f = files.get(file);
     if (!f) {
-      f = { file, touches: 0, kept: 0, impact: 0, experiments: [], regions: [], query: null };
+      f = { file, touches: 0, kept: 0, impact: 0, experiments: [], regions: [], component: null };
       files.set(file, f);
     }
     return f;
   };
-  ensure("schema.sql");
-  const basePQ = g.metric.baselinePerQuery;
-  for (const q of Object.keys(basePQ).sort()) {
-    ensure(`queries/${q}.sql`).query = { name: q, baseline: basePQ[q], current: basePQ[q], movedBy: [] };
+  // Resolve an agent-written file reference against the known files (suffix match), else keep as written.
+  const resolve = (raw: string): string => {
+    const f = clean(raw);
+    if (!f) return "(unspecified)";
+    const known = [...new Set([...g.files, ...files.keys()])];
+    return known.find((k) => k === f || k.endsWith(`/${f}`) || f.endsWith(`/${k}`) || f.endsWith(k)) ?? f;
+  };
+  g.files.forEach(ensure);
+
+  // Breakdown components (e.g. per-query values), optionally mapped to files by the target's file_pattern.
+  const components = new Map<string, ComponentHeat>();
+  const pattern = g.task.breakdown?.file_pattern;
+  for (const [name, base] of Object.entries(g.metric.baselineBreakdown)) {
+    const c: ComponentHeat = { name, baseline: base, current: base, movedBy: [] };
+    components.set(name, c);
+    if (pattern) ensure(resolve(pattern.replace("{name}", name))).component = c;
   }
 
   const regions = new Map<string, RegionHeat>();
-  const current: Record<string, number> = { ...basePQ };
-
   for (const e of g.experiments) {
-    const saved = e.outcome === "kept" && e.metricBefore !== null && e.metricAfter !== null ? Math.max(0, e.metricBefore - e.metricAfter) : 0;
-    const changed = e.filesChanged.length ? e.filesChanged.map(normFile) : [];
+    const kept = e.outcome === "kept" && e.metricBefore !== null && e.metricAfter !== null;
+    const gain = kept ? improvement(e.metricBefore!, e.metricAfter!) : 0;
+    const changed = e.filesChanged.map(resolve);
     for (const file of changed) {
       const f = ensure(file);
       f.touches += 1;
       f.experiments.push(e.id);
       if (e.outcome === "kept") {
         f.kept += 1;
-        f.impact += saved / changed.length;
+        f.impact += gain / changed.length;
       }
     }
-    // Regions come from what the agent said it would change (code_region on the hypotheses tested).
     const hs = e.hypothesisIds.map((id) => g.hypotheses[id]).filter(Boolean);
     for (const h of hs) {
-      const file = normFile(h.codeRegion.file);
+      const file = resolve(h.codeRegion.file);
       const symbol = normSymbol(h.codeRegion.symbol);
       const key = `${file}::${symbol.toLowerCase()}`;
       let r = regions.get(key);
@@ -83,40 +95,42 @@ export function buildHeatmap(g: GraphState): Heatmap {
       if (!r.hypotheses.includes(h.id)) r.hypotheses.push(h.id);
       if (e.outcome === "kept") {
         r.kept += 1;
-        r.impact += saved / hs.length;
+        r.impact += gain / hs.length;
       }
     }
-    // Per-query movement: only kept experiments change the "current" state.
     if (e.outcome === "kept") {
-      for (const [q, v] of Object.entries(e.perQuery ?? {})) {
-        const rowsNow = v?.read_rows;
-        if (rowsNow === null || rowsNow === undefined || current[q] === undefined) continue;
-        const delta = current[q] - rowsNow;
-        const f = files.get(`queries/${q}.sql`);
-        if (f?.query && Math.abs(delta) > 0) f.query.movedBy.push({ experiment: e.id, saved: delta });
-        current[q] = rowsNow;
-        if (f?.query) f.query.current = rowsNow;
+      for (const [name, v] of Object.entries(e.breakdown ?? {})) {
+        const c = components.get(name);
+        if (!c || v === null || v === undefined) continue;
+        const d = lowerIsBetter ? c.current - v : v - c.current;
+        if (d !== 0) c.movedBy.push({ experiment: e.id, improvement: d });
+        c.current = v;
       }
     }
   }
 
-  // Hypotheses that were proposed but never benchmarked still mark their region (untested).
+  // Hypotheses never evaluated still mark their region.
   for (const h of Object.values(g.hypotheses)) {
     if (h.tests.length) continue;
-    const file = normFile(h.codeRegion.file);
+    const file = resolve(h.codeRegion.file);
     const symbol = normSymbol(h.codeRegion.symbol);
     const key = `${file}::${symbol.toLowerCase()}`;
-    if (!regions.has(key)) regions.set(key, { key, file, symbol, touches: 0, kept: 0, impact: 0, hypotheses: [h.id] });
-    else if (!regions.get(key)!.hypotheses.includes(h.id)) regions.get(key)!.hypotheses.push(h.id);
+    const r = regions.get(key) ?? { key, file, symbol, touches: 0, kept: 0, impact: 0, hypotheses: [] };
+    if (!r.hypotheses.includes(h.id)) r.hypotheses.push(h.id);
+    regions.set(key, r);
   }
-
   for (const r of regions.values()) ensure(r.file).regions.push(r);
   for (const f of files.values()) f.regions.sort((a, b) => b.impact - a.impact || b.touches - a.touches);
 
-  const list = [...files.values()].sort((a, b) =>
-    a.file === "schema.sql" ? -1 : b.file === "schema.sql" ? 1 : a.file.localeCompare(b.file),
-  );
-  const maxImpact = Math.max(1, ...list.map((f) => f.impact), ...[...regions.values()].map((r) => r.impact));
-  const totalSaved = (g.metric.baseline ?? 0) - (g.metric.best ?? g.metric.baseline ?? 0);
-  return { files: list, maxImpact, totalSaved };
+  const list = [...files.values()].sort((a, b) => b.impact - a.impact || b.touches - a.touches || a.file.localeCompare(b.file));
+  const mapped = new Set(list.map((f) => f.component?.name).filter(Boolean));
+  const maxImpact = Math.max(1e-9, ...list.map((f) => f.impact), ...[...regions.values()].map((r) => r.impact));
+  const base = g.metric.baseline;
+  const best = g.metric.best;
+  return {
+    files: list,
+    unmappedComponents: [...components.values()].filter((c) => !mapped.has(c.name)),
+    maxImpact,
+    totalImprovement: base !== null && best !== null ? improvement(base, best) : 0,
+  };
 }

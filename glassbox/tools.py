@@ -31,15 +31,15 @@ def _norm(s: str) -> str:
 def build_server(log: EventLog):
     @tool(
         "propose_hypothesis",
-        "State a hypothesis BEFORE running an experiment (the benchmark is blocked until you do). "
-        "To re-test an existing hypothesis, pass its hypothesis_id. Prediction direction refers to total read_rows.",
+        "State a hypothesis BEFORE running an experiment (the evaluation is blocked until you do). "
+        "To re-test an existing hypothesis, pass its hypothesis_id. Prediction direction refers to the run's metric (see program.md).",
         {
             "type": "object",
             "properties": {
                 "claim": {"type": "string", "description": "What you believe, specific and testable."},
                 "topic": {"type": "string", "description": "Short area name, e.g. 'ordering key', 'time filters'. Reuse existing topics."},
                 "reason": {"type": "string", "description": "Why you believe it (evidence or mechanism)."},
-                "direction": {"type": "string", "enum": list(DIRECTIONS), "description": "Predicted effect on total read_rows."},
+                "direction": {"type": "string", "enum": list(DIRECTIONS), "description": "Predicted effect on the metric."},
                 "confidence": {"type": "number", "minimum": 0, "maximum": 1, "description": "Probability the prediction holds."},
                 "file": {"type": "string", "description": "File you will change: schema.sql or queries/<name>.sql"},
                 "symbol": {"type": "string", "description": "Region within the file, e.g. 'ORDER BY', 'column URL', 'q03 WHERE'."},
@@ -89,8 +89,8 @@ def build_server(log: EventLog):
             recent = ", ".join(f"{h} ({hs[h].get('topic')}, {hs[h]['status']})" for h in others[-6:])
             nudge = (f" If this builds on, refines or contradicts an earlier hypothesis, call link_hypotheses now "
                      f"(from {hid}). Recent: {recent}.")
-        return _ok(f"{hid} armed (topic '{topic}', predicts read_rows {args['direction']} @ {conf:.2f}). "
-                   f"You may now run the benchmark.{warning}{nudge}")
+        return _ok(f"{hid} armed (topic '{topic}', predicts the metric will {args['direction'].replace('_', ' ')} @ {conf:.2f}). "
+                   f"You may now run the evaluation.{warning}{nudge}")
 
     @tool(
         "link_hypotheses",
@@ -119,7 +119,7 @@ def build_server(log: EventLog):
 
     @tool(
         "record_result",
-        "After each benchmark: give your interpretation of the last experiment and whether you kept the change.",
+        "After each evaluation: give your interpretation of the last experiment and whether you kept the change.",
         {
             "type": "object",
             "properties": {

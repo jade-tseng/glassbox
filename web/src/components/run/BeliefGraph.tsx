@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { GraphState, HypothesisNode } from "@/lib/beliefEngine";
-import { Chip, EVIDENCE_STYLE, Label, STATUS_STYLE } from "./ui";
+import { Chip, EVIDENCE_STYLE, Label, STATUS_STYLE, arrowFor } from "./ui";
 
 type Props = {
   graph: GraphState;
@@ -198,7 +198,7 @@ function HypothesisCard({
         </div>
         <div className="flex justify-between font-mono text-[11px] text-muted">
           <span>
-            prior {Math.round(h.prediction.confidence * 100)}% · {h.prediction.direction === "decrease" ? "↓ rows" : h.prediction.direction === "increase" ? "↑ rows" : "= rows"}
+            prior {Math.round(h.prediction.confidence * 100)}% · {arrowFor(h.prediction.direction)} {graph.task.metric.short}
           </span>
           {evidence.length > 0 && (
             <span className={delta >= 0 ? "text-success" : "text-danger"}>

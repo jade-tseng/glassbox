@@ -82,8 +82,36 @@ export function Chip({ children, className = "", title }: { children: ReactNode;
   );
 }
 
-export const fmtRows = (n: number | null | undefined) =>
-  n === null || n === undefined ? "—" : n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : `${n}`;
+/** Compact number for any metric: 20.00M, 956.6k, 52, 0.4312. */
+export const fmtNum = (n: number | null | undefined) => {
+  if (n === null || n === undefined || !Number.isFinite(n)) return "—";
+  const a = Math.abs(n);
+  if (a >= 1e9) return `${(n / 1e9).toFixed(2)}B`;
+  if (a >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
+  if (a >= 1e4) return `${(n / 1e3).toFixed(1)}k`;
+  if (Number.isInteger(n)) return n.toLocaleString("en-US");
+  return a >= 100 ? n.toFixed(1) : n.toPrecision(4);
+};
+/** @deprecated use fmtNum (kept for older call sites) */
+export const fmtRows = fmtNum;
+
+/**
+ * Map a metric value to 0..1 "progress" from the baseline toward the best value seen, respecting whether
+ * lower or higher is better. Log scale when every value is positive (big early wins don't flatten later ones).
+ */
+export function progressScale(baseline: number, values: number[], direction: "lower" | "higher") {
+  const all = [baseline, ...values].filter((v) => Number.isFinite(v));
+  const useLog = all.every((v) => v > 0);
+  const f = (v: number) => (useLog ? Math.log(v) : v);
+  const extreme = direction === "lower" ? Math.min(...all) : Math.max(...all);
+  const span = Math.abs(f(extreme) - f(baseline)) || 1;
+  return (v: number) => {
+    const gain = direction === "lower" ? f(baseline) - f(v) : f(v) - f(baseline);
+    return Math.max(-0.1, Math.min(1, gain / span));
+  };
+}
+
+export const arrowFor = (d: string) => (d === "decrease" ? "↓" : d === "increase" ? "↑" : "=");
 
 export const fmtTime = (t: number) => {
   const m = Math.floor(t / 60);

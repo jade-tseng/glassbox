@@ -46,7 +46,8 @@ export type ExperimentNode = {
   errorMessage?: string;
   metricBefore: number | null;
   metricAfter: number | null;
-  relChange: number | null; // (before - after) / before; positive = fewer rows read
+  rawChange: number | null; // (after - before) / |before|
+  relChange: number | null; // improvement relative to before; positive = better (respects metric direction)
   observed: Direction | null;
   beatsBest: boolean;
   agentKept: boolean | null; // from record_result
@@ -54,7 +55,7 @@ export type ExperimentNode = {
   disagreement: boolean; // agent's "kept" vs harness "beats best"
   filesChanged: string[];
   diff: string;
-  perQuery: Record<string, { read_rows: number | null; latency_ms: number | null; correct?: boolean }>;
+  breakdown: Record<string, number | null>; // optional per-component metric values
 };
 
 export type EvidenceEdge = { experiment: string; hypothesis: string; kind: EvidenceKind; weight: number };
@@ -68,8 +69,31 @@ export type TopicNode = {
   brier: number | null; // calibration: mean (confidence - outcome)^2 over first tests
 };
 
+/** What the run is about. Declared by the run itself (run_started.task), so the UI is target-agnostic. */
+export type TaskMeta = {
+  name: string;
+  description: string;
+  agent: string;
+  provider: string; // model provider behind the harness, e.g. "Anthropic" or "Meta Model API"
+  model: string;
+  metric: { key: string; label: string; short: string; unit: string; direction: "lower" | "higher" };
+  breakdown: { label: string; file_pattern?: string } | null;
+};
+
+export const DEFAULT_TASK: TaskMeta = {
+  name: "Untitled run",
+  description: "",
+  agent: "agent",
+  provider: "",
+  model: "",
+  metric: { key: "metric", label: "metric", short: "metric", unit: "", direction: "lower" },
+  breakdown: null,
+};
+
 export type GraphState = {
   runId: string | null;
+  task: TaskMeta;
+  files: string[]; // editable files declared at run start
   seq: number; // last event included
   maxSeq: number;
   t: number;
@@ -83,7 +107,7 @@ export type GraphState = {
   messages: { seq: number; t: number; text: string }[];
   metric: {
     baseline: number | null;
-    baselinePerQuery: Record<string, number>;
+    baselineBreakdown: Record<string, number>;
     best: number | null;
     series: { seq: number; t: number; experiment: string; after: number | null; best: number | null; outcome: ExperimentNode["outcome"] }[];
   };
@@ -97,18 +121,51 @@ const WEAK_THRESHOLD = 0.01; // |relative change| below 1% is weak evidence
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const str = (v: unknown, d = ""): string => (typeof v === "string" ? v : d);
 
-function observedDirection(rel: number | null): Direction | null {
-  if (rel === null) return null;
-  if (rel > WEAK_THRESHOLD) return "decrease";
-  if (rel < -WEAK_THRESHOLD) return "increase";
+function observedDirection(raw: number | null): Direction | null {
+  if (raw === null) return null;
+  if (raw < -WEAK_THRESHOLD) return "decrease";
+  if (raw > WEAK_THRESHOLD) return "increase";
   return "no_change";
 }
+
+/** run_started -> TaskMeta. Older runs (before targets described themselves) were ClickBench read_rows. */
+function readTask(ev: GbEvent): TaskMeta {
+  const t = (ev.task ?? null) as Partial<TaskMeta> & { metric?: Partial<TaskMeta["metric"]>; breakdown?: TaskMeta["breakdown"] } | null;
+  if (!t) {
+    return {
+      name: "ClickBench dashboard on ClickHouse",
+      description: "Make a web-analytics dashboard read less data without changing any query's results.",
+      agent: "Claude Code (Agent SDK)",
+      provider: str(ev.provider, "Anthropic"),
+      model: str(ev.model),
+      metric: { key: "total_read_rows", label: "rows read", short: "rows", unit: "rows", direction: "lower" },
+      breakdown: { label: "query", file_pattern: "queries/{name}.sql" },
+    };
+  }
+  return {
+    name: str(t.name, DEFAULT_TASK.name),
+    description: str(t.description),
+    agent: str(ev.agent, "agent"),
+    provider: str(ev.provider, "Anthropic"), // runs before the provider field were all Anthropic
+    model: str(ev.model),
+    metric: { ...DEFAULT_TASK.metric, ...(t.metric ?? {}) } as TaskMeta["metric"],
+    breakdown: t.breakdown ?? null,
+  };
+}
+
+const toBreakdown = (ev: GbEvent): Record<string, number | null> => {
+  if (ev.breakdown && typeof ev.breakdown === "object") return ev.breakdown as Record<string, number | null>;
+  const pq = (ev.per_query ?? {}) as Record<string, { read_rows?: number | null } | number>;
+  return Object.fromEntries(Object.entries(pq).map(([k, v]) => [k, typeof v === "number" ? v : (v?.read_rows ?? null)]));
+};
 
 export function buildGraph(events: GbEvent[], upToSeq: number = Number.POSITIVE_INFINITY): GraphState {
   const sorted = [...events].sort((a, b) => a.seq - b.seq);
   const maxSeq = sorted.length ? sorted[sorted.length - 1].seq : 0;
   const state: GraphState = {
     runId: sorted[0]?.run_id ?? null,
+    task: DEFAULT_TASK,
+    files: [],
     seq: 0,
     maxSeq,
     t: 0,
@@ -120,7 +177,7 @@ export function buildGraph(events: GbEvent[], upToSeq: number = Number.POSITIVE_
     gateBlocks: [],
     actions: [],
     messages: [],
-    metric: { baseline: null, baselinePerQuery: {}, best: null, series: [] },
+    metric: { baseline: null, baselineBreakdown: {}, best: null, series: [] },
     calibration: { brier: null, n: 0 },
     finished: false,
   };
@@ -135,10 +192,12 @@ export function buildGraph(events: GbEvent[], upToSeq: number = Number.POSITIVE_
 
     switch (ev.type) {
       case "run_started": {
-        const b = ev.baseline as { total_read_rows?: number; per_query?: Record<string, number> } | undefined;
-        const base = num(b?.total_read_rows);
+        state.task = readTask(ev);
+        state.files = Object.keys((ev.files as Record<string, string>) ?? {}).sort();
+        const b = ev.baseline as { value?: number; total_read_rows?: number; breakdown?: Record<string, number>; per_query?: Record<string, number> } | undefined;
+        const base = num(b?.value ?? b?.total_read_rows);
         state.metric.baseline = base;
-        state.metric.baselinePerQuery = b?.per_query ?? {};
+        state.metric.baselineBreakdown = b?.breakdown ?? b?.per_query ?? {};
         state.metric.best = base;
         break;
       }
@@ -181,8 +240,10 @@ export function buildGraph(events: GbEvent[], upToSeq: number = Number.POSITIVE_
         const correct = ev.type === "experiment_run" && ev.correct !== false;
         const before = num(ev.metric_before);
         const after = num(ev.metric_after);
-        const rel = correct && before && after !== null ? (before - after) / before : null;
-        const observed = correct ? observedDirection(rel) : null;
+        const raw = correct && before && after !== null ? (after - before) / Math.abs(before) : null;
+        const lowerIsBetter = state.task.metric.direction !== "higher";
+        const rel = raw === null ? null : lowerIsBetter ? -raw : raw; // improvement, positive = better
+        const observed = correct ? observedDirection(raw) : null;
         const exp: ExperimentNode = {
           id: str(ev.id),
           seq: ev.seq,
@@ -194,6 +255,7 @@ export function buildGraph(events: GbEvent[], upToSeq: number = Number.POSITIVE_
           errorMessage: correct ? undefined : str(ev.message),
           metricBefore: before,
           metricAfter: after,
+          rawChange: raw,
           relChange: rel,
           observed,
           beatsBest: Boolean(ev.beats_best),
@@ -201,11 +263,12 @@ export function buildGraph(events: GbEvent[], upToSeq: number = Number.POSITIVE_
           disagreement: false,
           filesChanged: (ev.files_changed as string[]) ?? [],
           diff: str(ev.diff),
-          perQuery: (ev.per_query as ExperimentNode["perQuery"]) ?? {},
+          breakdown: toBreakdown(ev),
         };
         state.experiments.push(exp);
         expById.set(exp.id, exp);
-        if (correct && after !== null && (state.metric.best === null || after < state.metric.best)) {
+        const better = (a: number, b: number | null) => b === null || (lowerIsBetter ? a < b : a > b);
+        if (correct && after !== null && better(after, state.metric.best)) {
           state.metric.best = after;
         }
         state.metric.series.push({ seq: ev.seq, t: ev.t, experiment: exp.id, after, best: state.metric.best, outcome: exp.outcome });
@@ -310,7 +373,9 @@ export function buildGraph(events: GbEvent[], upToSeq: number = Number.POSITIVE_
 /** Compact, ID-rich serialization for the NL query (PLAN §4.8). */
 export function serializeForQuery(g: GraphState): string {
   const lines: string[] = [];
-  lines.push(`Run ${g.runId} at seq ${g.seq}. Metric total read_rows: baseline ${g.metric.baseline}, best ${g.metric.best}.`);
+  const m = g.task.metric;
+  lines.push(`Run ${g.runId}: ${g.task.name}. ${g.task.description}`);
+  lines.push(`At seq ${g.seq}. Metric "${m.label}" (${m.direction} is better): baseline ${g.metric.baseline}, best ${g.metric.best}.`);
   for (const topic of g.topics) {
     lines.push(`\nTOPIC "${topic.name}" (stance: ${topic.stance ?? "none"}, refuted: ${topic.refuted})`);
     for (const id of topic.hypothesisIds) {
@@ -327,7 +392,7 @@ export function serializeForQuery(g: GraphState): string {
     const delta = e.metricBefore !== null && e.metricAfter !== null ? `${e.metricBefore} -> ${e.metricAfter}` : "n/a";
     lines.push(
       `[${e.id}] tests ${e.hypothesisIds.join(",") || "-"}; ${e.outcome}${e.errorKind ? ` (${e.errorKind}: ${e.errorMessage?.slice(0, 160)})` : ""}; ` +
-        `read_rows ${delta}; files ${e.filesChanged.join(",")}${e.note ? `; agent note: ${e.note}` : ""}` +
+        `${m.label} ${delta}; files ${e.filesChanged.join(",")}${e.note ? `; agent note: ${e.note}` : ""}` +
         (e.disagreement ? "; NOTE agent 'kept' disagrees with harness" : ""),
     );
   }

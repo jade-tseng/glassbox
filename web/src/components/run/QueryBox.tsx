@@ -9,7 +9,8 @@ import { Chip, Label } from "./ui";
 
 type Result = { answer: Answer; confidence: number | null; seq: number; model: string; usage: { input_tokens: number } };
 
-const EXAMPLES = ["What worked best?", "Why did ideas get refuted?", "What do you believe about projections?"];
+// Generic: work for any run. Topic-specific follow-ups are typed by the user.
+const EXAMPLES = ["What worked best?", "Why did ideas get refuted?", "What does the agent believe now?", "Where was it surprised?"];
 
 export function QueryBox({
   runId,
@@ -71,7 +72,7 @@ export function QueryBox({
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Why did you give up on rewriting the time filters?"
+          placeholder="Ask why the agent believed, changed or dropped an idea"
           className="min-w-0 flex-1 bg-transparent font-mono text-[14px] text-ink placeholder:text-subtle focus:outline-none"
           aria-label="Ask the run a question"
         />

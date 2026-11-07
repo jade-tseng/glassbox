@@ -1,0 +1,17 @@
+{
+  "name": "ClickBench dashboard on ClickHouse",
+  "description": "Make a web-analytics dashboard read less data without changing any query's results (2M real ClickBench rows).",
+  "metric": { "key": "total_read_rows", "label": "rows read", "short": "rows", "unit": "rows", "direction": "lower" },
+  "breakdown": { "key": "per_query", "field": "read_rows", "label": "query", "file_pattern": "queries/{name}.sql" },
+  "editable": ["schema.sql", "queries/*.sql"],
+  "copy": ["schema.sql", "queries"],
+  "program": "program.md",
+  "eval": {
+    "command": "{python} {target}/bench.py --workdir .",
+    "match": "bench.py",
+    "result_file": "last_bench.json",
+    "correct_key": "correct",
+    "beats_best_key": "beats_best",
+    "error_key": "error"
+  }
+}

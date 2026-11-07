@@ -1,16 +1,16 @@
-"""Hooks (PLAN §4.4), as Agent SDK callbacks in the runner process.
+"""Hooks (PLAN §4.4), as Agent SDK callbacks in the runner process. Target-agnostic (see target.py).
 
-- gate:     PreToolUse Bash  — deny bench.py unless a hypothesis is armed (gate_blocked)
-- scope:    PreToolUse Edit/Write — only schema.sql and queries/*.sql (gate_blocked kind=scope)
-- capture:  PostToolUse Bash — parse bench.py's JSON line from tool_response.stdout -> experiment_run/failed
+- gate:     PreToolUse Bash  — deny the evaluator unless a hypothesis is armed (gate_blocked)
+- scope:    PreToolUse Edit/Write — only the target's editable files (gate_blocked kind=scope)
+- capture:  PostToolUse Bash — read the evaluator's result file -> experiment_run / experiment_failed
 - trace:    PostToolUse (non-glassbox tools) -> agent_action
 """
 
 from __future__ import annotations
 
 import difflib
-import time
 import json
+import time
 from pathlib import Path
 from typing import Any
 
@@ -18,15 +18,9 @@ from claude_agent_sdk import HookMatcher
 
 from . import state
 from .events import EventLog
+from .target import Target
 
 EDIT_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
-
-
-def snapshot(workdir: Path) -> dict[str, str]:
-    files = {"schema.sql": (workdir / "schema.sql").read_text() if (workdir / "schema.sql").exists() else ""}
-    for p in sorted((workdir / "queries").glob("*.sql")):
-        files[f"queries/{p.name}"] = p.read_text()
-    return files
 
 
 def unified_diff(before: dict[str, str], after: dict[str, str]) -> tuple[str, list[str]]:
@@ -44,11 +38,7 @@ def deny(reason: str) -> dict:
                                    "permissionDecisionReason": reason}}
 
 
-def is_bench(cmd: str) -> bool:
-    return "bench.py" in cmd
-
-
-def parse_bench(stdout: str) -> dict | None:
+def parse_last_json(stdout: str) -> dict | None:
     for line in reversed(stdout.strip().splitlines()):
         line = line.strip()
         if line.startswith("{"):
@@ -59,76 +49,71 @@ def parse_bench(stdout: str) -> dict | None:
     return None
 
 
-def build_hooks(log: EventLog, workdir: Path) -> dict[str, list[HookMatcher]]:
+def build_hooks(log: EventLog, workdir: Path, target: Target) -> dict[str, list[HookMatcher]]:
     workdir = workdir.resolve()
-    allowed = {workdir / "schema.sql"}
-    last_snapshot = {"files": snapshot(workdir)}
+    last_snapshot = {"files": target.snapshot(workdir)}
+    started: dict[str, float] = {}
 
     async def gate(inp: dict[str, Any], tool_use_id: str | None, ctx: Any) -> dict:
         cmd = inp.get("tool_input", {}).get("command", "")
-        if is_bench(cmd) and not state.armed(log.events):
+        if not target.is_eval(cmd):
+            return {}
+        if not state.armed(log.events):
             log.emit("gate_blocked", "hook", kind="no_hypothesis", command=cmd[:200])
             return deny("Blocked by Glassbox: state a hypothesis and prediction first "
-                        "(call mcp__glassbox__propose_hypothesis), then run the benchmark.")
+                        "(call mcp__glassbox__propose_hypothesis), then run the evaluation.")
+        started[tool_use_id or "last"] = time.time()
         return {}
 
     async def scope(inp: dict[str, Any], tool_use_id: str | None, ctx: Any) -> dict:
         raw = inp.get("tool_input", {}).get("file_path") or inp.get("tool_input", {}).get("notebook_path") or ""
         p = (workdir / raw).resolve() if raw and not Path(raw).is_absolute() else Path(raw).resolve()
-        ok = p in allowed or (p.parent == workdir / "queries" and p.suffix == ".sql")
-        if not ok:
+        try:
+            rel = p.relative_to(workdir).as_posix()
+        except ValueError:
+            rel = None
+        if rel is None or not target.is_editable(rel):
             log.emit("gate_blocked", "hook", kind="scope", tool=inp.get("tool_name"), file=str(raw)[:200])
-            return deny("Blocked by Glassbox: you may only edit schema.sql and queries/*.sql in this directory.")
-        return {}
-
-    started: dict[str, float] = {}
-
-    async def mark_start(inp: dict[str, Any], tool_use_id: str | None, ctx: Any) -> dict:
-        if is_bench(inp.get("tool_input", {}).get("command", "")):
-            started[tool_use_id or "last"] = time.time()
+            return deny(f"Blocked by Glassbox: you may only edit {', '.join(target.editable)} in this directory.")
         return {}
 
     async def capture(inp: dict[str, Any], tool_use_id: str | None, ctx: Any) -> dict:
         cmd = inp.get("tool_input", {}).get("command", "")
-        if not is_bench(cmd):
+        if not target.is_eval(cmd):
             return {}
         resp = inp.get("tool_response") or {}
         stdout = resp.get("stdout", "") if isinstance(resp, dict) else str(resp)
         stderr = resp.get("stderr", "") if isinstance(resp, dict) else ""
-        now = snapshot(workdir)
+        now = target.snapshot(workdir)
         diff, changed = unified_diff(last_snapshot["files"], now)
         last_snapshot["files"] = now
         hyp = state.armed(log.events)
         eid = f"E{len(state.experiments(log.events)) + 1}"
-        # Numbers come from the harness's own result file, not from whatever the agent did to stdout.
+        # Numbers come from the evaluator's own result file, not from whatever the agent did to stdout.
         out = None
-        result_file = workdir.parent / "last_bench.json"
+        result_file = workdir.parent / target.eval.get("result_file", "result.json")
         t_start = started.pop(tool_use_id or "last", 0.0)
-        if result_file.exists():
+        if result_file.exists() and result_file.stat().st_mtime >= t_start - 1:
             try:
-                candidate = json.loads(result_file.read_text())
-                if candidate.get("finished_at", 0) >= t_start - 1:
-                    out = candidate
+                out = json.loads(result_file.read_text())
             except json.JSONDecodeError:
                 out = None
-        out = out or parse_bench(stdout)
+        out = out or parse_last_json(stdout)
         if out is None:
             log.emit("experiment_failed", "hook", id=eid, hypothesis_ids=hyp, error_kind="crash",
                      message=(stderr or stdout)[-600:], diff=diff, files_changed=changed)
             return {}
-        before = out.get("best_read_rows_before") or state.best_metric(log.events)
-        per_query = {k: {"read_rows": v.get("read_rows"), "latency_ms": v.get("latency_ms"), "correct": v.get("correct")}
-                     for k, v in (out.get("per_query") or {}).items()}
-        common = dict(id=eid, hypothesis_ids=hyp, diff=diff, files_changed=changed, per_query=per_query,
-                      metric_before=before, metric_after=out.get("total_read_rows"),
-                      baseline=out.get("baseline_read_rows"), latency_ms=out.get("total_latency_ms"),
-                      schema_rebuilt=out.get("schema_rebuilt"))
-        if out.get("correct"):
-            log.emit("experiment_run", "hook", correct=True, beats_best=bool(out.get("beats_best")), **common)
+        r = target.normalize(out)
+        before = state.best_metric(log.events)
+        common = dict(id=eid, hypothesis_ids=hyp, diff=diff, files_changed=changed, breakdown=r["breakdown"],
+                      metric_before=before, metric_after=r["value"])
+        if r["correct"] and r["value"] is not None:
+            beats = r["beats_best"] if r["beats_best"] is not None else target.better(r["value"], before)
+            log.emit("experiment_run", "hook", correct=True, beats_best=bool(beats), **common)
         else:
-            err = out.get("error") or {}
+            err = r["error"] or {}
             log.emit("experiment_failed", "hook", correct=False, error_kind=err.get("kind", "unknown"),
-                     query=err.get("query"), message=str(err.get("message", ""))[:600], **common)
+                     where=err.get("query") or err.get("where"), message=str(err.get("message", ""))[:600], **common)
         return {}
 
     async def trace(inp: dict[str, Any], tool_use_id: str | None, ctx: Any) -> dict:
@@ -136,14 +121,14 @@ def build_hooks(log: EventLog, workdir: Path) -> dict[str, list[HookMatcher]]:
         if name.startswith("mcp__glassbox__"):
             return {}
         ti = inp.get("tool_input", {}) or {}
-        target = ti.get("file_path") or ti.get("command") or ti.get("pattern") or ti.get("path") or ""
-        if isinstance(target, str) and target.startswith(str(workdir)):
-            target = target[len(str(workdir)) + 1:]
-        log.emit("agent_action", "hook", tool=name, target=str(target)[:200], summary=str(ti.get("description", ""))[:200])
+        tgt = ti.get("file_path") or ti.get("command") or ti.get("pattern") or ti.get("path") or ""
+        if isinstance(tgt, str) and tgt.startswith(str(workdir)):
+            tgt = tgt[len(str(workdir)) + 1:]
+        log.emit("agent_action", "hook", tool=name, target=str(tgt)[:200], summary=str(ti.get("description", ""))[:200])
         return {}
 
     return {
-        "PreToolUse": [HookMatcher(matcher="Bash", hooks=[gate, mark_start]),
+        "PreToolUse": [HookMatcher(matcher="Bash", hooks=[gate]),
                        HookMatcher(matcher="|".join(EDIT_TOOLS), hooks=[scope])],
         "PostToolUse": [HookMatcher(matcher="Bash", hooks=[capture]),
                         HookMatcher(matcher=".*", hooks=[trace])],

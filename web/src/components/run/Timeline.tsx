@@ -1,11 +1,11 @@
 "use client";
 
 // Scrubber + belief timeline + agent activity strip (PLAN §4.9 bottom; UI.md scope band).
-// x = event seq. Lines = each hypothesis's confidence over time; the cyan step line = best total read_rows (log).
+// x = event seq. Lines = each hypothesis's confidence over time; the cyan step line = best metric so far (up = better).
 
 import { useEffect, useRef, useState } from "react";
 import type { GraphState } from "@/lib/beliefEngine";
-import { Label, PulseDot, STATUS_STYLE, fmtRows, fmtTime } from "./ui";
+import { Label, PulseDot, STATUS_STYLE, fmtNum as fmtRows, fmtTime, progressScale } from "./ui";
 
 const PAD_L = 44;
 const PAD_R = 64;
@@ -39,8 +39,8 @@ export function Timeline({
   const x = (seq: number) => PAD_L + ((seq - 1) / (max - 1)) * (w - PAD_L - PAD_R);
   const y = (c: number) => TOP + (1 - c) * CH;
   const base = full.metric.baseline ?? 1;
-  const minBest = Math.max(1, Math.min(...full.metric.series.map((s) => s.best ?? base), base) * 0.8);
-  const yM = (v: number) => TOP + (1 - (Math.log(base) - Math.log(v)) / Math.max(1e-9, Math.log(base) - Math.log(minBest))) * CH;
+  const prog = progressScale(base, full.metric.series.map((s) => s.best ?? base), full.task.metric.direction);
+  const yM = (v: number) => TOP + (1 - 0.92 * prog(v)) * CH; // up = better, whichever direction the metric improves
   const cx = x(Math.min(cursor, max));
   const exps = full.experiments;
   const expSeqs = exps.map((e) => e.seq);
@@ -88,7 +88,7 @@ export function Timeline({
               </text>
             </g>
           ))}
-          {/* metric: best read_rows, log scale, right axis */}
+          {/* metric: best so far, progress scale (up = better), right axis */}
           {full.metric.series.length > 0 && (
             <>
               <path
@@ -190,7 +190,7 @@ export function Timeline({
         <Legend color="var(--color-ice)" label="open" />
         <Legend color="var(--color-mint)" label="confirmed / kept" />
         <Legend color="var(--color-danger-fill)" label="refuted / invalid" />
-        <Legend color="var(--color-cyan)" label="best read_rows (log; up = fewer rows)" />
+<Legend color="var(--color-cyan)" label={`best ${full.task.metric.label} (up = better)`} />
         <Legend color="var(--color-violet)" label="agent message" />
         <Legend color="var(--color-warn-fill)" label="gate blocked" />
       </div>

@@ -60,18 +60,34 @@ def topics(events: list[Event]) -> list[str]:
     return seen
 
 
-def baseline_metric(events: list[Event]) -> int | None:
+def metric_meta(events: list[Event]) -> dict:
+    """The run's metric as declared by its target (defaults match the original ClickBench runs)."""
     for ev in events:
         if ev["type"] == "run_started":
-            return ev.get("baseline", {}).get("total_read_rows")
+            return {"key": "total_read_rows", "label": "rows read", "direction": "lower",
+                    **((ev.get("task") or {}).get("metric") or {})}
+    return {"key": "metric", "label": "metric", "direction": "lower"}
+
+
+def baseline_metric(events: list[Event]) -> float | None:
+    for ev in events:
+        if ev["type"] == "run_started":
+            b = ev.get("baseline", {}) or {}
+            return b.get("value", b.get("total_read_rows"))
     return None
 
 
-def best_metric(events: list[Event]) -> int | None:
+def _better(a: float, b: float | None, direction: str) -> bool:
+    return b is None or (a < b if direction == "lower" else a > b)
+
+
+def best_metric(events: list[Event]) -> float | None:
+    direction = metric_meta(events).get("direction", "lower")
     best = baseline_metric(events)
     for ev in events:
         if ev["type"] == "experiment_run" and ev.get("correct") and ev.get("metric_after") is not None:
-            best = ev["metric_after"] if best is None else min(best, ev["metric_after"])
+            if _better(ev["metric_after"], best, direction):
+                best = ev["metric_after"]
     return best
 
 
@@ -80,7 +96,9 @@ def beliefs_summary(events: list[Event]) -> str:
     hs = hypotheses(events)
     exps = {e["id"]: e for e in experiments(events)}
     base, best = baseline_metric(events), best_metric(events)
-    lines = [f"Metric: total read_rows (lower is better). Baseline {base:,}; best so far {best:,}." if base and best else ""]
+    m = metric_meta(events)
+    lines = [f"Metric: {m.get('label')} ({m.get('direction', 'lower')} is better). Baseline {base:,}; best so far {best:,}."
+             if base is not None and best is not None else ""]
     arm = armed(events)
     lines.append(f"Armed for next experiment: {', '.join(arm) if arm else 'none (propose before running bench)'}")
     for topic in topics(events):
