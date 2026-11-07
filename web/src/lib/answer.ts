@@ -25,7 +25,7 @@ export const rows = (n: number | null) =>
 function expLine(e: ExperimentNode, metric: string): string {
   if (!e.correct) return `${e.id}: ${e.errorKind}${e.errorMessage ? ` (${e.errorMessage.slice(0, 140)})` : ""}`;
   const rel = e.rawChange === null ? "" : ` (${e.rawChange <= 0 ? "−" : "+"}${Math.abs(e.rawChange * 100).toFixed(1)}%)`;
-  return `${e.id}: ${metric} ${rows(e.metricBefore)} → ${rows(e.metricAfter)}${rel}, ${e.outcome}`;
+  return `${e.id}: ${metric} ${rows(e.metricBefore)} → ${rows(e.metricAfter)}${rel}, ${e.outcome}${e.measuredBy === "client" ? " (client-reported)" : ""}`;
 }
 
 function hypItem(h: HypothesisNode, g: GraphState, relevance: number): AnswerItem {

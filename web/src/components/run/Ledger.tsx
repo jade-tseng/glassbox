@@ -76,6 +76,11 @@ export function Ledger({
                           <span className="flex items-center gap-2">
                             <span className="text-ink">{eid}</span>
                             {ev && <Chip className={EVIDENCE_STYLE[ev.kind].cls}>{EVIDENCE_STYLE[ev.kind].title.split(" ")[0]}</Chip>}
+                            {e.measuredBy === "client" && (
+                              <Chip className="border-line text-warning" title="Metric reported by the client, not measured by a Glassbox verifier">
+                                client-reported
+                              </Chip>
+                            )}
                           </span>
                           <span className="tabular-nums text-muted">
                             {e.correct ? `${fmtRows(e.metricBefore)} → ${fmtRows(e.metricAfter)}` : e.errorKind}

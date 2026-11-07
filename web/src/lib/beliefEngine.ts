@@ -56,6 +56,7 @@ export type ExperimentNode = {
   filesChanged: string[];
   diff: string;
   breakdown: Record<string, number | null>; // optional per-component metric values
+  measuredBy: "harness" | "client"; // harness = Glassbox's own verifier hook; client = reported via ingest/bridge
 };
 
 export type EvidenceEdge = { experiment: string; hypothesis: string; kind: EvidenceKind; weight: number };
@@ -146,7 +147,8 @@ function readTask(ev: GbEvent): TaskMeta {
     name: str(t.name, DEFAULT_TASK.name),
     description: str(t.description),
     agent: str(ev.agent, "agent"),
-    provider: str(ev.provider, "Anthropic"), // runs before the provider field were all Anthropic
+    // Our runner predates the provider field (all Anthropic); ingested runs say who they are or show none.
+    provider: str(ev.provider, ev.source === "ingest" ? "" : "Anthropic"),
     model: str(ev.model),
     metric: { ...DEFAULT_TASK.metric, ...(t.metric ?? {}) } as TaskMeta["metric"],
     breakdown: t.breakdown ?? null,
@@ -264,6 +266,7 @@ export function buildGraph(events: GbEvent[], upToSeq: number = Number.POSITIVE_
           filesChanged: (ev.files_changed as string[]) ?? [],
           diff: str(ev.diff),
           breakdown: toBreakdown(ev),
+          measuredBy: ev.source === "hook" ? "harness" : "client",
         };
         state.experiments.push(exp);
         expById.set(exp.id, exp);
