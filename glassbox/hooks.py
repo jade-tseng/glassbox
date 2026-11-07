@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import difflib
+import time
 import json
 from pathlib import Path
 from typing import Any
@@ -80,6 +81,13 @@ def build_hooks(log: EventLog, workdir: Path) -> dict[str, list[HookMatcher]]:
             return deny("Blocked by Glassbox: you may only edit schema.sql and queries/*.sql in this directory.")
         return {}
 
+    started: dict[str, float] = {}
+
+    async def mark_start(inp: dict[str, Any], tool_use_id: str | None, ctx: Any) -> dict:
+        if is_bench(inp.get("tool_input", {}).get("command", "")):
+            started[tool_use_id or "last"] = time.time()
+        return {}
+
     async def capture(inp: dict[str, Any], tool_use_id: str | None, ctx: Any) -> dict:
         cmd = inp.get("tool_input", {}).get("command", "")
         if not is_bench(cmd):
@@ -92,7 +100,18 @@ def build_hooks(log: EventLog, workdir: Path) -> dict[str, list[HookMatcher]]:
         last_snapshot["files"] = now
         hyp = state.armed(log.events)
         eid = f"E{len(state.experiments(log.events)) + 1}"
-        out = parse_bench(stdout)
+        # Numbers come from the harness's own result file, not from whatever the agent did to stdout.
+        out = None
+        result_file = workdir.parent / "last_bench.json"
+        t_start = started.pop(tool_use_id or "last", 0.0)
+        if result_file.exists():
+            try:
+                candidate = json.loads(result_file.read_text())
+                if candidate.get("finished_at", 0) >= t_start - 1:
+                    out = candidate
+            except json.JSONDecodeError:
+                out = None
+        out = out or parse_bench(stdout)
         if out is None:
             log.emit("experiment_failed", "hook", id=eid, hypothesis_ids=hyp, error_kind="crash",
                      message=(stderr or stdout)[-600:], diff=diff, files_changed=changed)
@@ -124,7 +143,7 @@ def build_hooks(log: EventLog, workdir: Path) -> dict[str, list[HookMatcher]]:
         return {}
 
     return {
-        "PreToolUse": [HookMatcher(matcher="Bash", hooks=[gate]),
+        "PreToolUse": [HookMatcher(matcher="Bash", hooks=[gate, mark_start]),
                        HookMatcher(matcher="|".join(EDIT_TOOLS), hooks=[scope])],
         "PostToolUse": [HookMatcher(matcher="Bash", hooks=[capture]),
                         HookMatcher(matcher=".*", hooks=[trace])],

@@ -6,6 +6,7 @@ import { buildGraph } from "@/lib/beliefEngine";
 import { BeforeView } from "./BeforeView";
 import { BeliefGraph } from "./BeliefGraph";
 import { Ledger } from "./Ledger";
+import { QueryBox } from "./QueryBox";
 import { Timeline } from "./Timeline";
 import { CountUp, Label, PulseDot, fmtRows } from "./ui";
 import { useRunEvents } from "./useRunEvents";
@@ -17,12 +18,18 @@ export function RunView({ runId }: { runId: string }) {
   const [scrub, setScrub] = useState<number | null>(null); // null = follow head
   const [selected, setSelected] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("graph");
-  const highlighted = useMemo(() => new Set<string>(), []);
+  const [cited, setCited] = useState<string[]>([]);
 
   const full = useMemo(() => buildGraph(events), [events]);
   const cursor = scrub ?? full.maxSeq;
   const graph = useMemo(() => (scrub === null ? full : buildGraph(events, scrub)), [events, full, scrub]);
   const running = feed === "live" && !full.finished;
+  // Cited experiments also light up the hypotheses they tested.
+  const highlighted = useMemo(() => {
+    const s = new Set(cited);
+    for (const e of graph.experiments) if (s.has(e.id)) e.hypothesisIds.forEach((h) => s.add(h));
+    return s;
+  }, [cited, graph]);
   const following = scrub === null;
 
   const newestId = useMemo(() => {
@@ -98,6 +105,19 @@ export function RunView({ runId }: { runId: string }) {
             label="Calibration"
             value={<CountUp value={graph.calibration.brier} format={(n) => n.toFixed(2)} />}
             sub={<span>Brier · n={graph.calibration.n} · lower is better</span>}
+          />
+        </div>
+
+        <div className="mt-6">
+          <QueryBox
+            runId={runId}
+            seq={scrub}
+            onCite={setCited}
+            onSelect={(id) => {
+              const exp = graph.experiments.find((e) => e.id === id);
+              setTab("graph");
+              setSelected(exp ? (exp.hypothesisIds[0] ?? null) : id);
+            }}
           />
         </div>
 

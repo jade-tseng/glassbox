@@ -74,11 +74,11 @@ def raw_columns(ch) -> list[str]:
     return [r[0] for r in ch.query("SELECT name FROM system.columns WHERE database='raw' AND table='hits_raw' ORDER BY position").result_rows]
 
 
-def rebuild(schema_sql: str) -> None:
+def rebuild(schema_sql: str, db: str) -> None:
     ch = client()
-    ch.command("DROP DATABASE IF EXISTS bench SYNC")
-    ch.command("CREATE DATABASE bench")
-    bench = client("bench")
+    ch.command(f"DROP DATABASE IF EXISTS {db} SYNC")
+    ch.command(f"CREATE DATABASE {db}")
+    bench = client(db)
     for stmt in split_statements(schema_sql):
         bench.command(stmt)
     cols = ", ".join(raw_columns(ch))
@@ -86,8 +86,8 @@ def rebuild(schema_sql: str) -> None:
     bench.command("OPTIMIZE TABLE hits FINAL")
 
 
-def run_queries(query_dir: Path, names: list[str]):
-    ch = client("bench")
+def run_queries(query_dir: Path, names: list[str], db: str):
+    ch = client(db)
     per_query, ids = {}, {}
     for name in names:
         path = query_dir / f"{name}.sql"
@@ -141,23 +141,28 @@ def main() -> int:
            "best_read_rows_before": state.get("best_read_rows")}
     t0 = time.time()
 
+    # One database per run directory, so concurrent runs (and tests) never share tables.
+    db = "bench_baseline" if a.init_baseline else "bench_" + hashlib.sha1(str(state_path.parent.resolve()).encode()).hexdigest()[:10]
     schema_sql = (workdir / "schema.sql").read_text()
     schema_hash = hashlib.sha256(schema_sql.encode()).hexdigest()
-    exists = client().command("EXISTS TABLE bench.hits") == 1
+    exists = client().command(f"EXISTS TABLE {db}.hits") == 1
     if a.init_baseline or not exists or state.get("schema_hash") != schema_hash:
         try:
-            rebuild(schema_sql)
+            rebuild(schema_sql, db)
         except Exception as e:  # noqa: BLE001
             state.pop("schema_hash", None)
             if not a.init_baseline:
                 state_path.write_text(json.dumps(state, indent=2))
             out["error"] = {"kind": classify(e), "query": "schema.sql", "message": short(e)}
+            if not a.init_baseline:
+                out["finished_at"] = time.time()
+                (state_path.parent / "last_bench.json").write_text(json.dumps(out))
             print(json.dumps(out))
             return 1
         state["schema_hash"] = schema_hash
         out["schema_rebuilt"] = True
 
-    per_query, err = run_queries(workdir / "queries", names)
+    per_query, err = run_queries(workdir / "queries", names, db)
     out["per_query"] = per_query
     if err:
         out["error"] = err
@@ -197,8 +202,22 @@ def main() -> int:
         v.pop("hash", None)
     if not a.init_baseline:
         state_path.write_text(json.dumps(state, indent=2))
-    print(json.dumps(out))
+        # Full result for the harness (the capture hook reads this file, not the agent's stdout).
+        out["finished_at"] = time.time()
+        (state_path.parent / "last_bench.json").write_text(json.dumps(out))
+    print(json.dumps(compact(out)) if not a.init_baseline else json.dumps(out))
     return 0 if out["ok"] else 1
+
+
+def compact(out: dict) -> dict:
+    """Short stdout line for the agent: totals + read_rows per query."""
+    keep = {k: out.get(k) for k in ("ok", "correct", "beats_best", "total_read_rows", "best_read_rows_before",
+                                    "baseline_read_rows", "error", "schema_rebuilt", "total_latency_ms")}
+    keep["read_rows_per_query"] = {k: v.get("read_rows") for k, v in (out.get("per_query") or {}).items()}
+    wrong = [k for k, v in (out.get("per_query") or {}).items() if v.get("correct") is False]
+    if wrong:
+        keep["incorrect_queries"] = wrong
+    return keep
 
 
 if __name__ == "__main__":

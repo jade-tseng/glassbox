@@ -84,6 +84,7 @@ export function BeliefGraph({ graph, selected, highlighted, newestId, live, onSe
                   dim={(selected !== null && selected !== id && !highlighted.has(id)) || (highlighted.size > 0 && !highlighted.has(id) && selected !== id)}
                   glow={highlighted.has(id)}
                   newest={live && newestId === id}
+                  highlightedExps={highlighted}
                   onSelect={onSelect}
                   refCb={(el) => (el ? cards.current.set(id, el) : cards.current.delete(id))}
                 />
@@ -141,7 +142,9 @@ function HypothesisCard({
   newest,
   onSelect,
   refCb,
+  highlightedExps,
 }: {
+  highlightedExps: Set<string>;
   h: HypothesisNode;
   graph: GraphState;
   stance: boolean;
@@ -211,7 +214,11 @@ function HypothesisCard({
           {evidence.map((e) => {
             const es = EVIDENCE_STYLE[e.kind];
             return (
-              <Chip key={e.experiment} className={es.cls} title={`${e.experiment}: ${es.title}`}>
+              <Chip
+                key={e.experiment}
+                className={`${es.cls} ${highlightedExps.has(e.experiment) ? "outline outline-2 outline-offset-1 outline-signal" : ""}`}
+                title={`${e.experiment}: ${es.title}`}
+              >
                 {e.experiment} {es.glyph}
               </Chip>
             );
