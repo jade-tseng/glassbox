@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+/* Design tokens — see /UI.md (source of truth) */
+:root {
+  --color-black: #202020;
+  --color-cream: #f5f2ec;
+  --color-white: #ffffff;
+  --color-sand: #e8e3d9;
+  --color-stone: #b9bab5;
+  --color-muted: #797979;
+  --color-accent: #d14f35;
+}
+
+@theme inline {
+  --color-ink: #202020;
+  --color-cream: #f5f2ec;
+  --color-sand: #e8e3d9;
+  --color-stone: #b9bab5;
+  --color-muted: #797979;
+  --color-accent: #d14f35;
+  --color-amber: #f2c247;
+  --color-orange: #e98f3e;
+  --color-blush: #e9c1ac;
+  --color-rose: #e599bb;
+  --color-lilac: #bfbbdc;
+  --color-sage: #bdddd0;
+  --color-sky: #8dc3e7;
+  --color-teal: #347980;
+  --color-emerald: #6abf79;
+  --color-chart: #9fb4b4;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+html {
+  background: var(--color-cream);
+  color: var(--color-black);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 24px;
+}
+
+h1, h2, h3, h4 {
+  font-weight: 400;
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
