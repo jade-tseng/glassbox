@@ -87,4 +87,4 @@ class Target:
     def meta(self) -> dict[str, Any]:
         """Self-description written into run_started, so the UI never needs to know the target."""
         return {"name": self.name, "description": self.description, "metric": self.metric,
-                "breakdown": self.breakdown, "editable": self.editable}
+                "breakdown": self.breakdown, "editable": self.editable, "verify": self.raw.get("verify")}

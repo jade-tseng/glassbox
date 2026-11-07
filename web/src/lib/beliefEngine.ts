@@ -79,6 +79,7 @@ export type TaskMeta = {
   model: string;
   metric: { key: string; label: string; short: string; unit: string; direction: "lower" | "higher" };
   breakdown: { label: string; file_pattern?: string } | null;
+  verify: { mode: string; description?: string; command?: string; key?: string } | null; // how correctness is checked
 };
 
 export const DEFAULT_TASK: TaskMeta = {
@@ -89,6 +90,7 @@ export const DEFAULT_TASK: TaskMeta = {
   model: "",
   metric: { key: "metric", label: "metric", short: "metric", unit: "", direction: "lower" },
   breakdown: null,
+  verify: null,
 };
 
 export type GraphState = {
@@ -141,6 +143,7 @@ function readTask(ev: GbEvent): TaskMeta {
       model: str(ev.model),
       metric: { key: "total_read_rows", label: "rows read", short: "rows", unit: "rows", direction: "lower" },
       breakdown: { label: "query", file_pattern: "queries/{name}.sql" },
+      verify: { mode: "result_hash", description: "every query's result must match the baseline" },
     };
   }
   return {
@@ -152,6 +155,7 @@ function readTask(ev: GbEvent): TaskMeta {
     model: str(ev.model),
     metric: { ...DEFAULT_TASK.metric, ...(t.metric ?? {}) } as TaskMeta["metric"],
     breakdown: t.breakdown ?? null,
+    verify: (t as { verify?: TaskMeta["verify"] }).verify ?? null,
   };
 }
 
