@@ -14,7 +14,7 @@ export type GbEvent = {
   seq: number;
   t: number;
   type: string;
-  source: "mcp" | "hook" | "system";
+  source: "mcp" | "hook" | "system" | "ingest";
   [key: string]: unknown;
 };
 
