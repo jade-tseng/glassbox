@@ -90,7 +90,7 @@ export const fmtNum = (n: number | null | undefined) => {
   if (a >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
   if (a >= 1e4) return `${(n / 1e3).toFixed(1)}k`;
   if (Number.isInteger(n)) return n.toLocaleString("en-US");
-  return a >= 100 ? n.toFixed(1) : n.toPrecision(4);
+  return a >= 100 ? n.toFixed(1) : String(Number(n.toPrecision(4))); // 0.0003 not 0.0003000
 };
 /** @deprecated use fmtNum (kept for older call sites) */
 export const fmtRows = fmtNum;
