@@ -8,11 +8,10 @@ import { Calibration, CalibrationLead, HypothesisMarquee, ImpactLead, RegionImpa
 import { RunsPanel } from "@/components/belief/RunsPanel";
 import { GlassCube } from "@/components/motion/GlassCube";
 import { Orbit } from "@/components/motion/Orbit";
-import { PulseDot, Reveal } from "@/components/motion/primitives";
+import { Reveal } from "@/components/motion/primitives";
 
 const label = "font-mono text-[12px] uppercase tracking-[0.08em] text-muted";
 const h2 = "text-[24px] font-medium leading-[1.15] tracking-[-0.025em] md:text-[28px]";
-const navLink = "transition-colors duration-150 hover:text-signal";
 
 function SectionLabel({ n, children }: { n: string; children: string }) {
   return (
@@ -27,34 +26,24 @@ export default function Home() {
     <ReplayProvider startAtEnd>
       <div className="flex min-h-full flex-col">
         {/* Nav */}
-        <header className="sticky top-0 z-20 border-b border-line bg-frost/85 backdrop-blur-md">
+        <header className="sticky top-0 z-20 border-b border-scope-line bg-scope text-scope-text">
           <nav className="mx-auto flex h-14 max-w-[1200px] items-center justify-between px-4 md:px-10">
             <span className="flex items-center gap-2 text-[18px] font-medium tracking-[-0.02em]">
-              <GlassCube size={18} />
+              <GlassCube size={18} stroke="var(--color-scope-text)" />
               glassbox
             </span>
-            <div className="flex gap-5 font-mono text-[12px] uppercase tracking-[0.08em] text-muted md:gap-6">
-              <a href="#runs" className={`hidden sm:inline ${navLink}`}>Runs</a>
-              <a href="#impact" className={`hidden md:inline ${navLink}`}>Impact</a>
-              <a href="#loop" className={`hidden md:inline ${navLink}`}>Loop</a>
-              <Link href="/run" className={navLink}>Tracker</Link>
-              <Link href="/new" className={navLink}>New</Link>
-            </div>
+            <Link href="/run" className="font-mono text-[12px] uppercase tracking-[0.08em] text-scope-muted transition-colors duration-150 hover:text-scope-text">
+              Runs
+            </Link>
           </nav>
         </header>
 
         {/* 01 — the one visual: Before → Beliefs */}
         <section id="beliefs" className="bg-scope px-4 pt-8 pb-14 text-scope-text md:px-10 md:pt-12 md:pb-20">
           <div className="mx-auto max-w-[1200px]">
-            <div className="mb-6 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-              <h1 className="text-[24px] font-medium leading-[1.15] tracking-[-0.025em] md:text-[28px]">
-                Inside an autoresearch run.
-              </h1>
-              <p className="flex items-center gap-2 font-mono text-[12px] uppercase tracking-[0.08em] text-scope-muted">
-                <PulseDot size={6} live={false} />
-                Claude Code · ClickHouse · 25 experiments · replay
-              </p>
-            </div>
+            <h1 className="mb-6 text-[24px] font-medium leading-[1.15] tracking-[-0.025em] md:text-[28px]">
+              Inside an autoresearch run.
+            </h1>
             <BeliefSection />
           </div>
         </section>
