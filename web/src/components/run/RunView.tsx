@@ -5,13 +5,14 @@ import { useMemo, useState } from "react";
 import { buildGraph } from "@/lib/beliefEngine";
 import { BeforeView } from "./BeforeView";
 import { BeliefGraph } from "./BeliefGraph";
+import { HeatmapView } from "./HeatmapView";
 import { Ledger } from "./Ledger";
 import { QueryBox } from "./QueryBox";
 import { Timeline } from "./Timeline";
 import { CountUp, Label, PulseDot, fmtRows } from "./ui";
 import { useRunEvents } from "./useRunEvents";
 
-type Tab = "graph" | "before";
+type Tab = "graph" | "heatmap" | "before";
 
 export function RunView({ runId }: { runId: string }) {
   const { events, meta, feed } = useRunEvents(runId);
@@ -126,6 +127,7 @@ export function RunView({ runId }: { runId: string }) {
           {(
             [
               ["graph", "02 / Belief graph"],
+              ["heatmap", "Heatmap"],
               ["before", "Before: dots only"],
             ] as const
           ).map(([key, label]) => (
@@ -140,9 +142,6 @@ export function RunView({ runId }: { runId: string }) {
               {label}
             </button>
           ))}
-          <span className="px-3 py-2 font-mono text-[12px] uppercase tracking-[0.08em] text-subtle" title="Coming next">
-            Heatmap
-          </span>
           {!following && (
             <span className="ml-auto font-mono text-[12px] text-warning">Viewing the past · seq {cursor}</span>
           )}
@@ -152,6 +151,14 @@ export function RunView({ runId }: { runId: string }) {
           <div className="min-w-0 rounded-[6px] border border-line bg-white p-4 md:p-5">
             {tab === "graph" ? (
               <BeliefGraph graph={graph} selected={selected} highlighted={highlighted} newestId={newestId} live={following} onSelect={setSelected} />
+            ) : tab === "heatmap" ? (
+              <HeatmapView
+                graph={graph}
+                onSelectHypothesis={(id) => {
+                  setSelected(id);
+                  setTab("graph");
+                }}
+              />
             ) : (
               <BeforeView graph={graph} />
             )}

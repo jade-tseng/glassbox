@@ -83,6 +83,7 @@ export type GraphState = {
   messages: { seq: number; t: number; text: string }[];
   metric: {
     baseline: number | null;
+    baselinePerQuery: Record<string, number>;
     best: number | null;
     series: { seq: number; t: number; experiment: string; after: number | null; best: number | null; outcome: ExperimentNode["outcome"] }[];
   };
@@ -119,7 +120,7 @@ export function buildGraph(events: GbEvent[], upToSeq: number = Number.POSITIVE_
     gateBlocks: [],
     actions: [],
     messages: [],
-    metric: { baseline: null, best: null, series: [] },
+    metric: { baseline: null, baselinePerQuery: {}, best: null, series: [] },
     calibration: { brier: null, n: 0 },
     finished: false,
   };
@@ -134,8 +135,10 @@ export function buildGraph(events: GbEvent[], upToSeq: number = Number.POSITIVE_
 
     switch (ev.type) {
       case "run_started": {
-        const base = num((ev.baseline as { total_read_rows?: number } | undefined)?.total_read_rows);
+        const b = ev.baseline as { total_read_rows?: number; per_query?: Record<string, number> } | undefined;
+        const base = num(b?.total_read_rows);
         state.metric.baseline = base;
+        state.metric.baselinePerQuery = b?.per_query ?? {};
         state.metric.best = base;
         break;
       }

@@ -56,7 +56,24 @@ export function useRunEvents(runId: string) {
         if (!stopped) timer = setTimeout(tick, 4000);
       }
     }
-    tick();
+    // Show a static replay instantly if one exists (cold Mongo connections can take seconds), then poll
+    // the API only for events after it.
+    (async () => {
+      try {
+        const r = await fetch(`/replays/${runId}.json`);
+        if (r.ok && after.current === 0) {
+          const evs = (await r.json()) as GbEvent[];
+          if (after.current === 0 && evs.length) {
+            after.current = evs.at(-1)!.seq;
+            setEvents(evs);
+            setFeed((f) => (f === "loading" ? "idle" : f));
+          }
+        }
+      } catch {
+        /* no replay: wait for the API */
+      }
+      tick();
+    })();
     return () => {
       stopped = true;
       clearTimeout(timer);
