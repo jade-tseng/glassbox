@@ -1,0 +1,45 @@
+{
+  "queries": {
+    "q01_business_hours": {
+      "hash": "aa3dfd203da52166713b61f510f5993f8b90506a641ef09275f5e3cbef290bf5",
+      "rows": 9
+    },
+    "q02_top_pages": {
+      "hash": "02116d07ee75a0269853d903a271407d6c94bfde950d35ee77cf1931aa8718a2",
+      "rows": 10
+    },
+    "q03_top_referrer_domains": {
+      "hash": "8da31d0e677b7ba84dbb2b3a48da4dc7d58d5c94652339e4290dde826c3b6f36",
+      "rows": 10
+    },
+    "q04_traffic_sources": {
+      "hash": "2063369fc678393816b38a2be4797535d8172cc2bd1fe57ced542a4019afe8bd",
+      "rows": 10
+    },
+    "q05_last_hour_by_minute": {
+      "hash": "e9e8ce91ca79b446d4253d536b115ad8b7c406be3575f590d22d40919fa87911",
+      "rows": 60
+    },
+    "q06_engaged_users": {
+      "hash": "46f80f2a0a066a27f0a39c4c2e6efcf11b9e47fa045731ee072b035ed60b8818",
+      "rows": 1
+    },
+    "q07_search_phrases": {
+      "hash": "bb31fe3aa78515d83a0a9b660534edb6d4cb0a4e23ec5c7ebcb156222c6e4a9a",
+      "rows": 10
+    },
+    "q08_mobile_models": {
+      "hash": "7f732beb7b6a3a54373f61727f81365ee165533203db8a584f3ff38ab66c0a73",
+      "rows": 10
+    },
+    "q09_region_users_site_1095": {
+      "hash": "669beb798892cf73b11c8cd39eb3f24fb59968ea0ede03229fa4763455000858",
+      "rows": 10
+    },
+    "q10_url_search": {
+      "hash": "6313d899af6d1e1c5d36203438dbd194984d21aeadbc49fd354404b56f61f612",
+      "rows": 5
+    }
+  },
+  "baseline_read_rows": 20000000
+}

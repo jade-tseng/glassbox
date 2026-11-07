@@ -11,3 +11,12 @@ __pycache__/
 .venv/
 .vercel
 .next/
+
+# Private planning doc (repo is public)
+PLAN.md
+
+# Large local data and run logs
+target/data/
+runs/*.jsonl
+__pycache__/
+.venv/

@@ -1,0 +1,19 @@
+# ClickHouse for the Glassbox autoresearch target. Local only (bound to 127.0.0.1).
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.8
+    container_name: glassbox-clickhouse
+    ports:
+      - "127.0.0.1:8123:8123"
+    environment:
+      CLICKHOUSE_USER: glassbox
+      CLICKHOUSE_PASSWORD: glassbox
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - ./data:/var/lib/clickhouse/user_files
+      - ch-data:/var/lib/clickhouse
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+
+volumes:
+  ch-data:

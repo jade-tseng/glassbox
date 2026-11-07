@@ -1,0 +1,16 @@
+[project]
+name = "glassbox"
+version = "0.1.0"
+description = "A drop-in belief layer for autoresearch loops"
+requires-python = ">=3.11"
+dependencies = [
+  "clickhouse-connect>=0.8",
+  "mcp>=1.10",
+  "pymongo>=4.8",
+  "pydantic>=2.7",
+  "python-dotenv>=1.0",
+  "claude-agent-sdk>=0.2.179",
+]
+
+[tool.uv]
+package = false
