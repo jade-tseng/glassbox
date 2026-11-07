@@ -34,7 +34,15 @@ read less data **without changing any query's results**.
    `refines`).
 7. One idea per experiment where possible, so the evidence stays attributable.
 
-## Budget
-- At most {MAX_EXPERIMENTS} benchmark runs. Stop earlier if you run out of credible ideas, and finish with
-  `get_beliefs` and a short summary of what you learned.
-- Work autonomously; don't ask questions. Keep messages short.
+## Budget and persistence
+- You have {MAX_EXPERIMENTS} benchmark runs. **Use all of them. Do not stop early**, even after a big win:
+  the first easy wins are only the start. Keep looking at the per-query `read_rows` in the output and attack
+  whichever queries still read the most.
+- Directions worth exploring once the obvious ones are done: rewriting queries so filters can use the primary key
+  (timezone wrappers, `formatDateTime`, string parsing), column types (`LowCardinality`, smaller ints), partitioning,
+  data-skipping indexes (minmax, set, bloom_filter, ngrambf/tokenbf), projections, materialized columns,
+  ordering-key variants and their trade-offs between queries.
+- Make bold predictions and test ideas you are unsure about. A refuted hypothesis is useful evidence, not a
+  failure: record it honestly.
+- Work autonomously; don't ask questions. Keep messages short. Only after the last run, call `get_beliefs` and
+  give a short summary of what you learned.

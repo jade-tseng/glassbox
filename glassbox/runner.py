@@ -97,15 +97,27 @@ async def run(args: argparse.Namespace) -> None:
 
     status = "finished"
     result: ResultMessage | None = None
+    cost = 0.0
     try:
-        async for msg in query(prompt=prompt, options=options):
-            if isinstance(msg, AssistantMessage):
-                for block in msg.content:
-                    if isinstance(block, TextBlock) and block.text.strip():
-                        log.emit("agent_message", "system", text=block.text.strip()[:2000])
-                        print(f"[agent] {block.text.strip()[:300]}", flush=True)
-            elif isinstance(msg, ResultMessage):
-                result = msg
+        for session in range(1 + args.max_continuations):
+            async for msg in query(prompt=prompt, options=options):
+                if isinstance(msg, AssistantMessage):
+                    for block in msg.content:
+                        if isinstance(block, TextBlock) and block.text.strip():
+                            log.emit("agent_message", "system", text=block.text.strip()[:2000], session=session)
+                            print(f"[agent] {block.text.strip()[:300]}", flush=True)
+                elif isinstance(msg, ResultMessage):
+                    result = msg
+                    cost += msg.total_cost_usd or 0.0
+            done = len(state.experiments(log.events))
+            if done >= args.max_experiments or cost >= args.budget_usd:
+                break
+            # The agent stopped early: start a fresh session; get_beliefs restores its working memory (PLAN §7).
+            print(f"[glassbox] agent stopped after {done}/{args.max_experiments} runs; continuing (session {session + 1})")
+            log.emit("agent_message", "system", text=f"[harness] Session restarted after {done} runs.", session=session + 1)
+            prompt = (f"You have used {done} of {args.max_experiments} benchmark runs; keep going until all are used. "
+                      "Re-read program.md, call get_beliefs to restore your working memory, check `git log --oneline`, "
+                      "then continue the loop with your next hypothesis. Do not stop early.")
     except (KeyboardInterrupt, asyncio.CancelledError):
         status = "interrupted"
     except Exception as e:  # noqa: BLE001
@@ -116,7 +128,7 @@ async def run(args: argparse.Namespace) -> None:
         log.emit("run_finished", "system", status=status,
                  best_read_rows=state.best_metric(log.events), baseline=state.baseline_metric(log.events),
                  experiments=len(exps), hypotheses=len(state.hypotheses(log.events)),
-                 cost_usd=getattr(result, "total_cost_usd", None), turns=getattr(result, "num_turns", None))
+                 cost_usd=round(cost, 4), turns=getattr(result, "num_turns", None))
         log.set_run(status=status, finished_at=time.time(), best=state.best_metric(log.events))
         log.mirror.flush()
         print(f"[glassbox] {status}: {len(exps)} experiments, best {state.best_metric(log.events):,} "
@@ -130,6 +142,7 @@ def main() -> None:
     ap.add_argument("--max-experiments", type=int, default=20)
     ap.add_argument("--max-turns", type=int, default=250)
     ap.add_argument("--budget-usd", type=float, default=15.0)
+    ap.add_argument("--max-continuations", type=int, default=5, help="restart the agent if it stops early")
     ap.add_argument("--resume", action="store_true")
     asyncio.run(run(ap.parse_args()))
 
