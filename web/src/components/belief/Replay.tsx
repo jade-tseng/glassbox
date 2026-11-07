@@ -29,10 +29,11 @@ type Replay = {
 
 const Ctx = createContext<Replay | null>(null);
 
-export function ReplayProvider({ children }: { children: ReactNode }) {
+/** `startAtEnd`: open on the finished run, paused (the page's first visual is the whole graph); Play replays it. */
+export function ReplayProvider({ children, startAtEnd = false }: { children: ReactNode; startAtEnd?: boolean }) {
   const reduced = usePrefersReducedMotion();
-  const [index, setIndex] = useState(0);
-  const [playing, setPlaying] = useState(true);
+  const [index, setIndex] = useState(startAtEnd ? EVENTS.length - 1 : 0);
+  const [playing, setPlayingRaw] = useState(!startAtEnd);
   const final = useMemo(() => buildGraph(EVENTS), []);
   const last = EVENTS.length - 1;
   const shownIndex = reduced && playing ? last : index;
@@ -47,6 +48,12 @@ export function ReplayProvider({ children }: { children: ReactNode }) {
     const id = setTimeout(() => setIndex((i) => (i >= last ? 0 : i + 1)), delay);
     return () => clearTimeout(id);
   }, [index, playing, reduced, last]);
+
+  // Pressing play on a finished replay starts it over instead of holding at the end.
+  const setPlaying = (p: boolean) => {
+    if (p && index >= last) setIndex(0);
+    setPlayingRaw(p);
+  };
 
   const value: Replay = {
     events: EVENTS,

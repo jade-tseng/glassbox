@@ -3,7 +3,8 @@
 // The belief view: Before | Beliefs tabs over one canvas (dots fly between them),
 // inspector beside it, timeline + scrubber below. Focus is shared across all three.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useInView } from "@/components/motion/useInView";
 import { BeliefGraph } from "./BeliefGraph";
 import { BeliefTimeline } from "./BeliefTimeline";
 import { Inspector } from "./Inspector";
@@ -14,26 +15,38 @@ const TABS = [
   { id: "beliefs", label: "Beliefs · why" },
 ] as const;
 
+const AUTO_MORPH_MS = 3200;
+
+/** Opens on Before, then flies to Beliefs once on its own (unless the viewer picked a tab first). */
 export function BeliefSection() {
   const [mode, setMode] = useState<"before" | "beliefs">("before");
+  const [touched, setTouched] = useState(false);
   const [focus, setFocus] = useState<string | null>(null);
+  const { ref, seen } = useInView<HTMLDivElement>("0px");
+
+  useEffect(() => {
+    if (touched || !seen || mode !== "before") return;
+    const id = setTimeout(() => {
+      setMode("beliefs");
+      setTouched(true);
+    }, AUTO_MORPH_MS);
+    return () => clearTimeout(id);
+  }, [touched, seen, mode]);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div ref={ref} className="flex flex-col gap-6">
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0">
-          <p className="mb-5 max-w-[68ch] text-[14px] leading-6 text-scope-text/85">
-            Start on Before: that&apos;s what autoresearch normally shows. Switch to Beliefs: each dot becomes evidence
-            for a hypothesis. <span className="font-mono text-scope-text">┆</span> is what the agent predicted;{" "}
-            <span className="font-mono text-scope-text">▬</span> is what the measurements say now.
-          </p>
           <div role="tablist" className="relative mb-4 flex gap-6 border-b border-scope-line font-mono text-[12px] uppercase tracking-[0.08em]">
             {TABS.map((t) => (
               <button
                 key={t.id}
                 role="tab"
                 aria-selected={mode === t.id}
-                onClick={() => setMode(t.id)}
+                onClick={() => {
+                  setTouched(true);
+                  setMode(t.id);
+                }}
                 className={`relative pb-2.5 transition-colors duration-150 ${mode === t.id ? "text-scope-text" : "text-scope-muted hover:text-scope-text"}`}
               >
                 {t.label}

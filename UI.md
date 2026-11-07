@@ -356,15 +356,16 @@ Agents can now run research loops by themselves. What they leave behind is a sco
 *Glassbox is general: any task with a fixed verifier (a codebase + a benchmark, a dataset + an eval) can be the input. ClickHouse is just the first target. Don't say "RL environment" in the hero; save it for the closing section.*
 
 ### 9.2 Page order (the narrative arc)
-| # | Section | Job | Reader leaves knowing |
-|---|---|---|---|
-| 0 | Hero | Name the gap, state what Glassbox does | "Autoresearch hides the reasoning; this shows it." |
-| 1 | `00 / Context` | Problem + research taste | Why reasoning matters more than the score |
-| 2 | `01 / The run` | Set up the input: task, verifier, **main hypothesis** | What this agent was trying to prove |
-| 3 | `02 / Beliefs` | Before → beliefs reveal; the sub-hypotheses | What it believed, tested, dropped and learned |
-| 4 | `03 / Impact` | What mattered, and how well calibrated it was | Which ideas paid off; whether its confidence meant anything |
-| 5 | `04 / Loop` | The rule that makes it trustworthy | Predict → measure → update, enforced by a gate |
-| 6 | `05 / Why it matters` | RL-environment framing + how it works underneath | Why environment builders should care, and that it's real |
+**One visual first, few words.** The landing page opens straight on the graph; the argument is made in the talk, not on the page.
+
+| # | Section | Job |
+|---|---|---|
+| 1 | `Inside an autoresearch run.` (top, scope) | A real run opens on **Before** (the keep/discard chart), then flies to **Beliefs** on its own after ~3s. The inspector and timeline sit below it. |
+| 2 | `02 / Runs` | Every real run as a compact table linking to its run view, plus `Describe a problem →` (/new) and `All runs →` (/run). |
+| 3 | `03 / Impact` | Which ideas paid off, with one computed sentence per chart. |
+| 4 | `04 / Loop` | The orbit: predict → measure → update, with the gate at the center. |
+
+*Removed from the landing page (Nov 7, evening): the hero copy and instrument, `00 / Context`, `01 / The run`, `05 / Why it matters`. Their copy below (§9.3–9.5, §9.9) stays as talk-track and run-view reference.*
 
 ### 9.3 Hero
 - Headline: "Autoresearch shows what worked. Glassbox shows why."
