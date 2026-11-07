@@ -8,7 +8,7 @@ function getClient(): Promise<MongoClient> {
   if (!uri) throw new Error("MONGODB_URI is not set (see web/.env.example)");
   if (!globalForMongo._mongoClient) {
     globalForMongo._mongoClient = new MongoClient(uri, {
-      appName: "hackathon-nov26",
+      appName: "glassbox",
       serverSelectionTimeoutMS: 8000,
     })
       .connect()
@@ -23,5 +23,5 @@ function getClient(): Promise<MongoClient> {
 
 export async function getDb(): Promise<Db> {
   const client = await getClient();
-  return client.db(process.env.MONGODB_DB ?? "hackathon");
+  return client.db(process.env.MONGODB_DB ?? "glassbox");
 }

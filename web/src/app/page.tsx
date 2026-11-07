@@ -55,7 +55,7 @@ export default function Home() {
         <nav className="mx-auto flex h-14 max-w-[1200px] items-center justify-between px-4 md:px-10">
           <span className="flex items-center gap-2 text-[20px] font-medium tracking-[-0.02em]">
             <span className="inline-block h-3 w-3 bg-ink" aria-hidden />
-            hackathon
+            glassbox
           </span>
           <div className="hidden gap-8 text-sm md:flex">
             <a href="#features" className="hover:underline">Features</a>
@@ -77,7 +77,7 @@ export default function Home() {
             Something great is being built here today.
           </h1>
           <p className="mt-6 max-w-[520px] text-base text-ink">
-            This is the placeholder for our hackathon frontend demo. Specs are on the way.
+            This is the placeholder for the Glassbox demo. Specs are on the way.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <a
@@ -140,7 +140,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="mt-auto border-t border-stone bg-cream px-4 py-10 text-sm text-muted md:px-10">
-        <div className="mx-auto max-w-[1200px]">hackathon-nov26 · Nov 2026</div>
+        <div className="mx-auto max-w-[1200px]">Glassbox · Nov 2026</div>
       </footer>
     </div>
   );
