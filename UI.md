@@ -7,8 +7,6 @@ Glassbox is a **belief layer for autoresearch loops** (see `PLAN.md`). Every exp
 
 > **The one idea to communicate:** *the agent commits to a prediction before the harness measures it.* Every screen should make that visible: the ghost prediction drawn first, then the measured result landing on it, then the belief moving.
 
-> History: v1 of this file borrowed heavily from tokenizehq.com (cream paper, vermillion, earthy palette, pill buttons, brick terrain). v2 keeps only the general idea of hairline structure and drops their palette, shapes, illustration style and copy patterns.
-
 ---
 
 ## 1. The look in one paragraph
