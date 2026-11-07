@@ -44,7 +44,10 @@ def setup_workdir(run_dir: Path, max_experiments: int) -> tuple[Path, dict]:
     shutil.copytree(TARGET / "queries", work / "queries")
     (run_dir / "bench_state.json").unlink(missing_ok=True)
     base = subprocess.run(BENCH_CMD.split(), cwd=work, capture_output=True, text=True)
-    baseline = json.loads(base.stdout.strip().splitlines()[-1])
+    result_file = run_dir / "last_bench.json"  # full harness result (stdout is the compact agent view)
+    if not result_file.exists():
+        raise SystemExit(f"Baseline benchmark produced no result: {base.stderr[-500:] or base.stdout[-500:]}")
+    baseline = json.loads(result_file.read_text())
     if not baseline.get("correct"):
         raise SystemExit(f"Baseline benchmark failed: {baseline.get('error')}")
     program = (TARGET / "program.md").read_text()
