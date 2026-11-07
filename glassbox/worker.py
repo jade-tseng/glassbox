@@ -4,7 +4,9 @@ the website can't run agents).
   uv run python -m glassbox.worker              # poll forever
   uv run python -m glassbox.worker --once       # handle what's pending, then exit
 
-Loop: dry_run_requested -> dry run (evaluate the untouched workspace once) -> ready | dry_run_failed | invalid
+Loop: intake_requested  -> intake agent interprets the plain-language description -> needs_input (questions)
+                           or straight on to a dry run when nothing is ambiguous
+      dry_run_requested -> dry run (evaluate the untouched workspace once) -> ready | dry_run_failed | invalid
       queued            -> build target -> run the Glassbox runner (events stream to the run view) -> finished | failed
 """
 
@@ -20,8 +22,24 @@ import time
 
 from dotenv import load_dotenv
 from pymongo import MongoClient, ReturnDocument
+from pymongo.errors import AutoReconnect, NetworkTimeout, ServerSelectionTimeoutError
+
+TRANSIENT = (AutoReconnect, NetworkTimeout, ServerSelectionTimeoutError)
+
+
+def retry(fn, attempts: int = 5):
+    """Atlas drops idle connections (e.g. during a long run); retry transient errors with backoff."""
+    for i in range(attempts):
+        try:
+            return fn()
+        except TRANSIENT as e:
+            if i == attempts - 1:
+                raise
+            print(f"[worker] transient Mongo error, retrying: {e}")
+            time.sleep(1 + 2 * i)
 
 from .cases import CASES, build_target, dry_run, validate
+from .intake import interpret
 from .events import ROOT
 
 WORKER = f"{socket.gethostname()}:{os.getpid()}"
@@ -33,16 +51,33 @@ def db():
 
 
 def claim(cases, from_status: str, to_status: str):
-    return cases.find_one_and_update(
+    return retry(lambda: cases.find_one_and_update(
         {"status": from_status},
         {"$set": {"status": to_status, "worker": WORKER, "updated_at": time.time()}},
         sort=[("updated_at", 1)],
         return_document=ReturnDocument.AFTER,
-    )
+    ))
 
 
 def set_status(cases, cid: str, **fields) -> None:
-    cases.update_one({"_id": cid}, {"$set": {**fields, "updated_at": time.time()}})
+    retry(lambda: cases.update_one({"_id": cid}, {"$set": {**fields, "updated_at": time.time()}}))
+
+
+def handle_intake(cases, doc) -> None:
+    conv = doc.get("conversation") or []
+    try:
+        r = interpret(doc["_id"], conv, doc.get("spec"))
+    except Exception as e:  # noqa: BLE001
+        set_status(cases, doc["_id"], status="needs_input", questions=[{"field": "general", "question":
+                   f"Interpreting failed ({e}). Could you rephrase or add detail?", "suggestion": ""}])
+        return
+    qs = r["questions"]
+    reply = r["summary"] + ("".join(f"\n- {q['question']}" + (f" (suggested: {q['suggestion']})" if q.get("suggestion") else "")
+                                    for q in qs) if qs else "")
+    retry(lambda: cases.update_one({"_id": doc["_id"]}, {"$push": {"conversation": {"role": "glassbox", "text": reply.strip(), "at": time.time()}}}))
+    set_status(cases, doc["_id"], spec=r["spec"], summary=r["summary"], questions=qs,
+               status="needs_input" if qs else "dry_run_requested")
+    print(f"[worker] {doc['_id']}: interpreted; {len(qs)} question(s)")
 
 
 def handle_dry_run(cases, doc) -> None:
@@ -92,12 +127,21 @@ def main() -> None:
     print(f"[worker] {WORKER} polling for cases (Ctrl-C to stop)")
     while True:
         did = False
-        if doc := claim(cases, "dry_run_requested", "dry_running"):
-            handle_dry_run(cases, doc)
-            did = True
-        elif doc := claim(cases, "queued", "starting"):
-            handle_run(cases, doc)
-            did = True
+        try:
+            if doc := claim(cases, "intake_requested", "interpreting"):
+                handle_intake(cases, doc)
+                did = True
+            elif doc := claim(cases, "dry_run_requested", "dry_running"):
+                handle_dry_run(cases, doc)
+                did = True
+            elif doc := claim(cases, "queued", "starting"):
+                handle_run(cases, doc)
+                did = True
+        except KeyboardInterrupt:
+            raise
+        except Exception as e:  # noqa: BLE001  one bad case or network blip must not kill the worker
+            print(f"[worker] error: {e!r}; continuing")
+            time.sleep(a.interval)
         if a.once and not did:
             break
         if not did:

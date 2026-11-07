@@ -52,6 +52,27 @@ Pick the one that matches how your agent runs.
 
 All three write the same events; the UI can't tell them apart except for the *client-reported* label.
 
+### Or just describe it: `/new`
+
+Write what you want improved in plain language, e.g. *"Make count_primes in /home/me/primes faster. bench.py
+measures it."* A worker on the machine with the code picks it up:
+
+1. **Intake agent** (read-only Claude) reads your description and the code, fills in the measure command, how to
+   read the number, what may change, and how to verify correctness, then asks **only** what's unclear. It always
+   confirms verification if you didn't state it.
+2. **Dry run**: the untouched code is measured once through the generic evaluator
+   ([`glassbox/adapter.py`](glassbox/adapter.py)): the number must parse and the check must pass.
+3. **Start**: the runner (A) runs the case; you watch it in the run view, and it appears in `/run`.
+
+```bash
+uv run python -m glassbox.worker      # on the machine that has the code and your agent login
+```
+
+The generic evaluator wraps any command: metric from a JSON key, a regex or the last number printed; verification
+by a test command (must exit 0), a JSON flag, unchanged output, or none (flagged as unverified). Structured
+specs can also be posted directly: `POST /api/cases {"action": "dry_run", "spec": {...}}` (see
+[`glassbox/cases.py`](glassbox/cases.py) for the spec).
+
 ### A. Glassbox runner (Claude Code via the Agent SDK, your own target)
 
 The runner gives the agent in-process belief tools plus hooks: it **blocks your evaluator until a hypothesis is

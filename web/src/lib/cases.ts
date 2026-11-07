@@ -19,6 +19,9 @@ export type CaseSpec = {
 };
 
 export type CaseStatus =
+  | "intake_requested" // plain-language description waiting for the worker's intake agent
+  | "interpreting"
+  | "needs_input" // the intake agent asked clarifying questions
   | "draft"
   | "dry_run_requested"
   | "dry_running"
@@ -31,9 +34,15 @@ export type CaseStatus =
   | "finished"
   | "failed";
 
+export type Message = { role: "user" | "glassbox"; text: string; at: number };
+export type Question = { field: string; question: string; suggestion?: string };
+
 export type CaseDoc = {
   _id: string;
   spec: CaseSpec;
+  conversation?: Message[];
+  summary?: string;
+  questions?: Question[];
   status: CaseStatus;
   dry_run?: { ok: boolean; value: number | null; correct: boolean; error: { kind: string; message: string } | null; errors?: string[] };
   run_id?: string;
