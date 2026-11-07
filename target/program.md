@@ -29,10 +29,16 @@ read less data **without changing any query's results**.
 5. Keep or revert with git (this directory is a git repo):
    - kept (correct and better): `git add -A && git commit -m "<id>: <short description>"`
    - not kept: `git checkout -- .` (restore the last committed state)
-6. When the evidence on a hypothesis is clear, `close_hypothesis` it as `confirmed`, `refuted`, or `abandoned`.
-   Don't re-test closed hypotheses. When two ideas interact, `link_hypotheses` (`contradicts` / `depends_on` /
-   `refines`).
-7. One idea per experiment where possible, so the evidence stays attributable.
+6. **Link related hypotheses (required).** Right after proposing, if your reason mentions or builds on an earlier
+   hypothesis, call `link_hypotheses` from the new one to the earlier one:
+   - `refines`: a narrower or improved version of an earlier idea (e.g. a different projection key for the same query)
+   - `depends_on`: only makes sense because an earlier change was kept (e.g. tuning on top of the new ordering key)
+   - `contradicts`: if this is true, the earlier hypothesis (or its explanation) must be wrong, or the two
+     changes compete for the same query and can't both win
+   Most hypotheses after the first few relate to something earlier, so expect to link often.
+7. When the evidence on a hypothesis is clear, `close_hypothesis` it as `confirmed`, `refuted`, or `abandoned`.
+   Don't re-test closed hypotheses.
+8. One idea per experiment where possible, so the evidence stays attributable.
 
 ## Budget and persistence
 - You have {MAX_EXPERIMENTS} benchmark runs. **Use all of them. Do not stop early**, even after a big win:

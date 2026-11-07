@@ -83,8 +83,14 @@ def build_server(log: EventLog):
                  prediction={"direction": args["direction"], "confidence": conf},
                  code_region={"file": args["file"], "symbol": args["symbol"]},
                  retest=bool(args.get("hypothesis_id")))
+        others = [h for h in hs if h != hid]
+        nudge = ""
+        if others:
+            recent = ", ".join(f"{h} ({hs[h].get('topic')}, {hs[h]['status']})" for h in others[-6:])
+            nudge = (f" If this builds on, refines or contradicts an earlier hypothesis, call link_hypotheses now "
+                     f"(from {hid}). Recent: {recent}.")
         return _ok(f"{hid} armed (topic '{topic}', predicts read_rows {args['direction']} @ {conf:.2f}). "
-                   f"You may now run the benchmark.{warning}")
+                   f"You may now run the benchmark.{warning}{nudge}")
 
     @tool(
         "link_hypotheses",
