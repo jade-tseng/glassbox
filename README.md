@@ -3,6 +3,7 @@
 One-day hackathon project. Specs TBD.
 
 - **Design system:** see [UI.md](UI.md). It is the source of truth for all frontend styling.
+- **Gemini reference:** see [docs/GEMINI.md](docs/GEMINI.md) (model IDs, Interactions API rules). Helper: `web/src/lib/gemini.ts`, check: `/api/gemini/ping`.
 
 ## Frontend demo (`web/`)
 
