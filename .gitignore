@@ -20,3 +20,6 @@ target/data/
 runs/
 __pycache__/
 .venv/
+
+# Generated case targets (from /new wizard specs)
+/cases/
