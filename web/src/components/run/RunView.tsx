@@ -10,6 +10,7 @@ import { Ledger } from "./Ledger";
 import { QueryBox } from "./QueryBox";
 import { Timeline } from "./Timeline";
 import { CountUp, Label, PulseDot, fmtNum } from "./ui";
+import { useChecks } from "./useChecks";
 import { useRunEvents } from "./useRunEvents";
 
 type Tab = "graph" | "heatmap" | "before";
@@ -22,6 +23,7 @@ export function RunView({ runId }: { runId: string }) {
   const [cited, setCited] = useState<string[]>([]);
 
   const full = useMemo(() => buildGraph(events), [events]);
+  const checks = useChecks(runId, full.experiments.length); // hack signals (SubQ Snap), cached server-side
   const cursor = scrub ?? full.maxSeq;
   const graph = useMemo(() => (scrub === null ? full : buildGraph(events, scrub)), [events, full, scrub]);
   const running = feed === "live" && !full.finished;
@@ -171,7 +173,7 @@ export function RunView({ runId }: { runId: string }) {
             )}
           </div>
           <div className="h-[640px] overflow-hidden rounded-[6px] border border-line bg-white lg:sticky lg:top-20">
-            <Ledger graph={graph} selected={selected} highlighted={highlighted} onSelect={setSelected} />
+            <Ledger graph={graph} selected={selected} highlighted={highlighted} onSelect={setSelected} checks={checks} />
           </div>
         </div>
       </section>

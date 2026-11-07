@@ -4,18 +4,24 @@
 // reason, every experiment that tested it (harness numbers + the agent's note), and the latest diff.
 
 import type { GraphState } from "@/lib/beliefEngine";
+import type { HackCheck } from "@/lib/hackChecks";
 import { Chip, EVIDENCE_STYLE, Label, STATUS_STYLE, fmtRows } from "./ui";
+import { FLAG_TEXT } from "./useChecks";
+
+const pct = (p: number) => `${Math.round(p * 100)}%`;
 
 export function Ledger({
   graph,
   selected,
   highlighted,
   onSelect,
+  checks = {},
 }: {
   graph: GraphState;
   selected: string | null;
   highlighted: Set<string>;
   onSelect: (id: string | null) => void;
+  checks?: Record<string, HackCheck>;
 }) {
   const hs = Object.values(graph.hypotheses).sort((a, b) => b.proposedSeq - a.proposedSeq);
   const exps = new Map(graph.experiments.map((e) => [e.id, e]));
@@ -31,6 +37,7 @@ export function Ledger({
           const st = STATUS_STYLE[h.status];
           const open = selected === h.id;
           const evidence = graph.evidence.filter((e) => e.hypothesis === h.id);
+          const flagged = h.tests.some((id) => checks[id]?.flags.length);
           return (
             <div key={h.id} className={`border-b border-line ${open ? "bg-frost" : ""}`}>
               <button
@@ -52,6 +59,11 @@ export function Ledger({
                         {EVIDENCE_STYLE[e.kind].glyph}
                       </span>
                     ))}
+                    {flagged && (
+                      <span className="text-warning" title="SubQ Snap flagged an experiment: open for details">
+                        ⚑
+                      </span>
+                    )}
                   </span>
                 </span>
                 <Chip className={`shrink-0 ${st.chip}`}>{st.label}</Chip>
@@ -88,6 +100,29 @@ export function Ledger({
                         </div>
                         {e.errorMessage && <p className="mt-1 font-mono text-[11px] text-danger">{e.errorMessage.slice(0, 220)}</p>}
                         {e.note && <p className="mt-2 text-ink">“{e.note}”</p>}
+                        {checks[eid] && (
+                          <div className="mt-2 border-t border-line pt-2 font-mono text-[11px] leading-[16px]">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-muted">
+                              <span className="uppercase tracking-[0.08em]">Signals</span>
+                              <span title="P(diff implements the hypothesis)">on-topic {pct(checks[eid].on_topic)}</span>
+                              <span>·</span>
+                              <span title="P(gain comes from places the hypothesis doesn't predict)">unexplained {pct(checks[eid].unexplained)}</span>
+                              <span>·</span>
+                              <span title="P(the change alters what is computed)">semantics {pct(checks[eid].semantics)}</span>
+                            </div>
+                            {checks[eid].flags.length > 0 ? (
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {checks[eid].flags.map((f) => (
+                                  <Chip key={f} className="border-transparent bg-warn-fill text-ink">
+                                    ⚑ {FLAG_TEXT[f]}
+                                  </Chip>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="mt-1 text-success">✓ tests what it claimed · {checks[eid].fit.label.toLowerCase()}</p>
+                            )}
+                          </div>
+                        )}
                         {e.disagreement && (
                           <p className="mt-1 font-mono text-[11px] text-warning">Agent kept={String(e.agentKept)}; harness beats_best={String(e.beatsBest)}</p>
                         )}
