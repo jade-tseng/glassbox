@@ -17,6 +17,6 @@ PLAN.md
 
 # Large local data and run logs
 target/data/
-runs/*.jsonl
+runs/
 __pycache__/
 .venv/
