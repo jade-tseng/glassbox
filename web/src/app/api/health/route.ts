@@ -1,7 +1,5 @@
 import { getDb } from "@/lib/mongodb";
 
-export const dynamic = "force-dynamic";
-
 // GET /api/health — confirms the app can reach MongoDB.
 export async function GET() {
   try {
