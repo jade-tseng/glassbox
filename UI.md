@@ -3,7 +3,9 @@
 **This file is the source of truth for all frontend styling in this project.**
 Every page, component and chart in the demo follows it. If something isn't covered here, pick the option that is calmer, more legible, and still moving.
 
-Glassbox makes an agent's run visible: hypotheses, tool calls, gates, bench results. The UI should feel like **looking into a running instrument through glass**. It's built on an editorial base (hairlines, generous space, regular-weight type) with a cool palette and a layer of motion that never stops. The page is a live specimen, not a pitch: **no CTAs, no sign-up buttons, no marketing copy.**
+Glassbox is a **belief layer for autoresearch loops** (see `PLAN.md`). Every experiment becomes a hypothesis with a reason, a prediction, a measured result, and a belief update. The UI's one job is to make **what the agent believed, why, and what it learned** legible at a glance, and to show it changing. It should feel like **looking into a running instrument through glass**. It's built on an editorial base (hairlines, generous space, regular-weight type) with a cool palette and a layer of motion that never stops. The page is a live specimen, not a pitch: **no CTAs, no sign-up buttons, no marketing copy.**
+
+> **The one idea to communicate:** *the agent commits to a prediction before the harness measures it.* Every screen should make that visible: the ghost prediction drawn first, then the measured result landing on it, then the belief moving.
 
 > History: v1 of this file borrowed heavily from tokenizehq.com (cream paper, vermillion, earthy palette, pill buttons, brick terrain). v2 keeps only the general idea of hairline structure and drops their palette, shapes, illustration style and copy patterns.
 
@@ -11,7 +13,7 @@ Glassbox makes an agent's run visible: hypotheses, tool calls, gates, bench resu
 
 ## 1. The look in one paragraph
 
-Cool, precise, alive. Pages sit on **frost** (`#F2F4F5`) and white, with **graphite** ink (`#121417`). One family (Geist + Geist Mono). Mono does a lot of work: labels, eyebrows, numbers, timestamps, event names. Structure comes from 1px hairlines and **6px-radius panels**. There are no pills and no shadows. Color comes from a **cool signal palette** (cobalt, cyan, mint, phosphor lime, violet), plus coral and amber kept only for failure and warning. One dark **scope** band per page is where the live trace runs. Something on screen is always gently moving: a scanline, a pulse, a stream of events, a number ticking. It reads as an instrument panel that happens to be a web page.
+Cool, precise, alive. Pages sit on **frost** (`#F2F4F5`) and white, with **graphite** ink (`#121417`). One family (Geist + Geist Mono). Mono does a lot of work: labels, eyebrows, numbers, timestamps, event names. Structure comes from 1px hairlines and **6px-radius panels**. There are no pills and no shadows. Color comes from a **cool signal palette** (cobalt, cyan, mint, phosphor lime, violet), plus coral and amber kept only for failure and warning. One dark **scope** surface holds the belief graph, where beliefs grow, strengthen and collapse. Something on screen is always gently moving: a scanline, a pulse, a stream of events, a number ticking. It reads as an instrument panel that happens to be a web page.
 
 ---
 
@@ -31,7 +33,7 @@ Cool, precise, alive. Pages sit on **frost** (`#F2F4F5`) and white, with **graph
 
 ### 2.2 The scope (dark surface)
 
-One full-bleed dark band per page. This is where live trace streams, terminals and the hero instrument go. It's our counterpart to a "feature" section, and it replaces any accent-colored block.
+One full-bleed dark band per page. This is where the belief graph, the activity strip and the hero instrument go. In the app, the graph canvas is the scope. It's our counterpart to a "feature" section, and it replaces any accent-colored block.
 
 | Token | Value | Use |
 |---|---|---|
@@ -50,17 +52,16 @@ One full-bleed dark band per page. This is where live trace streams, terminals a
 
 ### 2.4 Data palette (cool, glassy)
 
-For chart series, event-type swatches, avatars and diagrams. Don't use these for large UI chrome.
+**Topics** get these colors, assigned in order of first appearance and stable for the run. Examples from `runs/bg2` are *ordering key*, *projections*, *time filters* and *skip indexes*. A topic's color marks its cluster hull, its hypotheses' left bars, its belief-timeline lines and its heatmap regions. Don't use these for large UI chrome. Mint, coral and amber are **not** topic colors; they're reserved for evidence and status (§2.5).
 
-| Order | Token | Hex | Typical meaning in Glassbox |
-|---|---|---|---|
-| 1 | `--color-cobalt` | `#3A4BFF` | Hypothesis / primary series |
-| 2 | `--color-cyan` | `#22B8CF` | Tool call |
-| 3 | `--color-violet` | `#8B7CF6` | Model / reasoning |
-| 4 | `--color-mint` | `#7FE0C2` | Bench / measurement |
-| 5 | `--color-ice` | `#A9C7FF` | Diff / file change |
-| 6 | `--color-lime` | `#B8F23A` | Live |
-| 7 | `--color-slate` | `#5C6B78` | Neutral / other |
+| Order | Token | Hex |
+|---|---|---|
+| 1 | `--color-cobalt` | `#3A4BFF` |
+| 2 | `--color-cyan` | `#22B8CF` |
+| 3 | `--color-violet` | `#8B7CF6` |
+| 4 | `--color-ice` | `#A9C7FF` |
+| 5 | `--color-slate` | `#5C6B78` |
+| 6+ | cycle with dashed hulls | |
 
 **Semantic** (text-safe on light):
 - success `#0F9D76`
@@ -69,9 +70,31 @@ For chart series, event-type swatches, avatars and diagrams. Don't use these for
 
 On the scope, use the fills (`#7FE0C2`, `#FFB224`, `#FF6B5A`) as text.
 
-### 2.5 Color rules
+### 2.5 Belief semantics (fixed meanings, used everywhere)
+
+| Thing | Value | Visual |
+|---|---|---|
+| Hypothesis **open** | ink/scope-text outline | Confidence bar animates; small `PulseDot` while an experiment for it is running |
+| Hypothesis **confirmed** | mint `#7FE0C2` (text `#0F9D76` on light) | Solid outline, full-opacity card |
+| Hypothesis **refuted** | coral `#FF6B5A` | Card drops to 45% opacity, claim struck through in muted, bar drained |
+| Hypothesis **abandoned** | slate | 45% opacity, dashed outline |
+| Evidence **supports** | mint | Solid edge experiment → hypothesis |
+| Evidence **refutes** | coral | Solid edge |
+| Evidence **weak** (tiny delta) | `--color-subtle` | Dotted edge |
+| Experiment **invalid** (`incorrect_result`, SQL error, timeout) | coral fill with a white `×` | Gets no edge weight. Gets a ring, because it's the "faster but wrong" proof moment |
+| Experiment dot **kept** / **discarded** | mint fill / hollow slate | Same as PLAN §4.9 |
+| Agent `kept` ≠ harness `beats_best` | amber 4px corner tick on the dot | "Interesting, not an error" |
+| **Gate blocked** | amber `#FFB224` | Small diamond marker on the timeline and next to the topic hull |
+| **Prediction** (stated before the run) | dashed outline in the hypothesis's topic color, 50% opacity | Always drawn *before* the result. The result fills it in |
+| Cross-link `contradicts` | coral dashed + label | |
+| Cross-link `depends_on` | scope-muted solid + arrowhead + label | |
+| Cross-link `refines` | ice dashed + label | |
+| **Cited by a query answer** | `--color-signal` 2px ring + signal glow chip with the citation number | |
+
+### 2.6 Color rules
 - Sections alternate **frost → white → scope → frost**. A hairline sits between light sections. The scope needs no border.
-- Each event type keeps its color everywhere (stream dot, chart series, legend, timeline segment).
+- Each topic keeps its color everywhere (hull, card bar, timeline line, heatmap region).
+- Status colors (mint/coral/amber) always mean the §2.5 belief semantics and nothing else.
 - Lime is reserved for "now". If everything is lime, nothing is live. Use at most ~3 lime elements in a viewport.
 - Never let color carry meaning alone. Pair every swatch with a mono label.
 
@@ -102,7 +125,7 @@ On the scope, use the fills (`#7FE0C2`, `#FFB224`, `#FF6B5A`) as text.
 | Metric small | 20px | `-0.02em` | Mono 400, tabular |
 
 ### 3.4 Labels, not eyebrows
-Section labels are **mono, uppercase, 12px, with a leading index** like `01 / TRACE` or `02 / SIGNALS`. That's our pattern. Don't use the two-tone (black + gray) headline.
+Section labels are **mono, uppercase, 12px, with a leading index** like `01 / REASONING` or `02 / SIGNALS`. That's our pattern. Don't use the two-tone (black + gray) headline.
 
 ---
 
@@ -134,7 +157,7 @@ Motion is how Glassbox says "this is live". Every screen has three layers:
 | Layer | What it is | Examples | Always on? |
 |---|---|---|---|
 | **Ambient** | Slow background life that implies a running system | signal grid shimmer, scanline sweep, orbiting nodes, drifting marquee | Yes, while in view |
-| **Live** | Data-driven change. Each movement means an event happened | new trace row slides in, number ticks, bar grows, pulse dot, typing caret | Yes, when data arrives (or simulated) |
+| **Live** | Data-driven change. Each movement means an event happened | graph node appears and its edge draws in, signal flows along links, event row slides in, number ticks, bar grows, pulse dot, typing caret | Yes, when data arrives (or simulated) |
 | **Response** | Direct feedback to the user | hover tint, press, focus ring, expand | On interaction |
 
 ### 6.1 Tokens
@@ -169,7 +192,7 @@ Motion is how Glassbox says "this is live". Every screen has three layers:
 | `Reveal` | Section/child entrance on scroll | opacity 0→1, y 12→0, blur 4→0; `--dur-slow`; once; `delay = index × --stagger` |
 | `PulseDot` | "Live" indicator | 8px lime dot plus a ring that scales 1→2.4 and fades, 2s loop. Grey and still when idle |
 | `CountUp` | Number ticking to a value | `--dur-slow`, ease-out, tabular mono so width never jitters. Re-ticks from the old value when the value changes |
-| `TraceStream` | Live log of agent events | New row enters at top: y −8→0, opacity, with a lime left-edge flash that fades to the event color over 1.2s. Max ~8 rows visible, bottom row fades out under a mask |
+| `EventLog` | Raw feed of agent events (secondary, e.g. the hero instrument) | New row enters at top: y −8→0, opacity, with a lime left-edge flash that fades to the event color over 1.2s. Max ~8 rows visible, bottom row fades out under a mask |
 | `Scanline` | Ambient sweep across the scope / instrument | 1px lime line with a 48px soft trail, translateY across the frame, 6s linear loop, 35% opacity |
 | `SignalGrid` | Hero background | Dot grid (24px pitch, `--color-line`). A diagonal wave lightens dots to cobalt/lime and back, about 8s cycle, done in canvas or CSS with `background-position` |
 | `Orbit` | Diagram nodes on dashed ellipses | 1px `--color-line` dashed orbits; 6px nodes travel at 24–40s per lap, each orbit a different speed |
@@ -178,15 +201,37 @@ Motion is how Glassbox says "this is live". Every screen has three layers:
 | `BarGrow` | Bars and proportion segments | `scaleX`/`scaleY` from 0 with origin at the baseline, `--dur-slow`, staggered |
 | `LineDraw` | Sparklines and diagrams drawing in | `stroke-dasharray = length`, offset length→0, `--dur-slow`. For live sparklines, new points shift the path left with a `translateX` |
 | `Shimmer` | Pending / loading | `--color-mist` block with a 1.2s light sweep. Don't use spinners |
+| `GraphGrow` | Belief graph nodes and links appearing | Card enters with opacity + y 8→0, `--dur-slow`. Existing nodes tween to their new ELK positions (600ms `--ease-in-out`). Edges draw with `stroke-dashoffset` (pathLength 1). The newest card gets a lime outline that fades over 1.2s |
+| `EdgeFlow` | Evidence travelling from experiment to hypothesis | 2px particle in the evidence color (mint supports, coral refutes, none for weak/invalid), 1 pass per 2.4s. Only on edges whose experiment is under 10s old (§6.5). Paused offscreen |
+| `BeliefTween` | Confidence changing | The posterior fill tweens (600ms, `--ease-out`) from the old value to the new one, and its mono number `CountUp`s. The dashed prediction tick never moves |
+| `Collapse` | Hypothesis refuted | The bar drains to 0 (600ms), then the card goes to 45% opacity, y +4px, and the claim is struck through (280ms). No bounce |
+| `FlyTo` | Before → Graph morph | A FLIP tween of shared-id dots from the staircase chart to their graph positions, 600ms `--ease-in-out`, 30ms stagger |
 
-### 6.4 Choreography of a live event
-When the agent emits an event (e.g. `tool_call · bench.sh`):
-1. **0ms.** The row slides into `TraceStream` with a lime edge.
-2. **+60ms.** The related metric `CountUp`s (e.g. `events` +1, `read_rows` → 123).
-3. **+120ms.** The timeline/proportion bar segment for that event type grows.
-4. **+1200ms.** The lime edge settles to the event-type color. Only the newest row stays lime.
+### 6.4 Choreography of one experiment cycle
+Motion follows the real event sequence (PLAN §4.5). Each step is triggered by its event, never by a timer:
 
-A denied gate (`gate · denied`) uses coral for the edge, and the row does a single 2px horizontal shake (`--dur-base`). That's the only "shake" in the system.
+| Event | What moves (≤ 600ms each, `--ease-out`) |
+|---|---|
+| `hypothesis_proposed` | A card fades and rises into its topic cluster (the ELK layout re-flows existing nodes with a 600ms position tween, never a jump). The **prediction** draws as a dashed ghost: `↓ read_rows · 70%`. The confidence bar fills from 0 to the stated prior. Lime flash on the card |
+| `gate_blocked` | An amber diamond drops onto the timeline at `t`, and the topic hull does one 2px shake. That's the only shake in the system |
+| `experiment_run` | An experiment dot appears next to the hypothesis with a lime ring. The edge **draws** from dot to card (stroke-dashoffset). A particle travels along it in the evidence color. The metric staircase steps down (or not) as a `CountUp` |
+| `experiment_failed` / invalid | The dot lands in coral with an `×`. The edge stays dotted and weightless. A coral ring pulses three times, then stops |
+| `experiment_interpreted` | The agent's note types into the ledger row (`Typewriter`). The kept/beats_best mismatch tick appears if they disagree |
+| (belief engine update) | The confidence bar **tweens** to the new posterior. If it crosses 0.5, the number flips color. The belief-timeline line extends with `LineDraw` |
+| `hypothesis_closed` | Confirmed: the card outline settles to mint. Refuted: the card **collapses**: the bar drains to 0 over 600ms, then the card fades to 45% opacity and drops 4px (gravity, not bounce). The claim is struck through |
+| `hypothesis_linked` | The cross-link draws between the two cards, then its label fades in |
+
+When the scrubber moves, the same transitions play **in reverse or skip forward**: everything is a pure function of `seq` (`buildGraph(events, upToSeq)`), and the view tweens between states (280ms), so rewinding feels like rewinding.
+
+### 6.5 Motion semantics (every motion means something)
+- **Growing or filling** means belief gained.
+- **Draining or dropping** means belief lost.
+- **Something travelling along a link** means evidence flowing from experiment to belief.
+- **A lime flash** means "this just happened".
+- **A signal ring** means "the answer cites this".
+- **Shake** happens once per gate block, and nowhere else.
+
+Ambient loops (signal grid, orbit, scanline) are only for the landing page and empty states. **In the app, nothing moves unless an event caused it**, except the `LIVE` pulse and the particles on edges whose experiment is less than 10s old.
 
 ---
 
@@ -197,7 +242,7 @@ A denied gate (`gate · denied`) uses coral for the edge, and the row does a sin
 
 ### Hero (instrument)
 - Left: display-size name or a one-line descriptor (≤8 words, period), then a mono label row (`SAMPLE RUN · 12 events · 00:41`).
-- Right or below: the **instrument frame**, a 6px-radius panel on scope with `Scanline`, a mini `TraceStream`, and a `CountUp` row.
+- Right or below: the **instrument frame**, a 6px-radius panel on scope holding a miniature `BeliefGraph` replaying a real run (`runs/bg2` as the SAMPLE source), with `Scanline`, and a `CountUp` row (`read_rows 20.0M → 1.32M`, hypotheses, refuted, gate blocks). It replaces the event log.
 - Background: `SignalGrid`.
 - **No buttons, no "✓ no setup required" rows, no subheading pitch.**
 
@@ -207,8 +252,67 @@ White, 1px line, 6px radius, padding 20–24px. A mono label at the top (`TOOL C
 ### Metric tile
 Mono label (12px, muted) → `CountUp` value (mono 32–40px) → delta (12px mono, success/danger color with `↑`/`↓`). Tiles are separated by hairlines in a row.
 
-### Trace row
-Height 32px; 13px mono. Columns: `time` (muted, `00:12.4`) · 8px event-type dot · event name · detail (muted, truncated) · right-aligned value. On scope: `--color-scope-raised` hover.
+### App shell (the demo app, PLAN §4.9)
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ ◇ glassbox   run bg2 ▾      [ Ask: why did you give up on H6? ]  ● LIVE │  56px nav + query box
+├────────────────────────────────────────────────┬─────────────────────┤
+│  GRAPH | HEATMAP | BEFORE                      │  LEDGER             │
+│                                                │  H9  projections  ▮▮▮▯ 0.71 │
+│   scope canvas: topic hulls, hypothesis        │  H8  skip indexes ▮▮▮▮ 0.86 │
+│   cards, experiment dots, cross-links          │  H6  projections  ▯▯▯▯ ✕    │
+│                                                │  …                  │
+│                                                │  answer panel (when asked) │
+├────────────────────────────────────────────────┴─────────────────────┤
+│ BELIEF TIMELINE  (confidence lines per hypothesis, gate diamonds)       │
+│ ACTIVITY ▏▏▏ ▏▏  ▏▏▏▏ ▏                                                  │
+│ ◀ ━━━━━━━━━━━━━━━━━━━━━━━━●━━━━━━━━━━  seq 54 / 70   00:02:16          │  scrubber
+└──────────────────────────────────────────────────────────────────────┘
+```
+- The graph canvas is the scope (dark). The ledger and timeline are light (white panels on frost). One dark surface only.
+- The right ledger is 320px and collapses to a bottom sheet under `lg`.
+- Tabs are mono 12px uppercase. The active tab has a 1px ink underline, which slides between tabs (`--dur-base`).
+
+### Belief graph (signature component)
+The centerpiece, implemented with `@xyflow/react` + ELK, with custom node and edge components only (no default xyflow styles).
+- **Topic hull:** a rounded 12px region with a 1px line in the topic color at 40% opacity, a 4% topic-color fill, and a mono uppercase topic label at top-left with counts (`PROJECTIONS · 7 · 2 refuted`). Collapsed by default when it has more than 4 hypotheses (PLAN §7: clutter). It expands to a fan.
+- **Hypothesis card (220×~76):** scope-raised, 6px radius, 2px topic-color left bar.
+  - Row 1: mono id + status chip (`H6 · REFUTED`).
+  - Row 2: claim, 13px sans, 2 lines max.
+  - Row 3: the **prediction-vs-belief bar**. A 4px track with a dashed tick at the stated prior (the prediction) and a solid fill at the current posterior. The gap between tick and fill is the story: was the agent over- or under-confident? The number is mono on the right (`0.50 → 0.08`).
+- **Experiment dots (10px):** these orbit the bottom edge of their hypothesis card in seq order. They're filled or hollow per §2.5, and an edge to the card is colored by its evidence type. Hovering shows a tooltip with `E6 · read_rows 2.31M → 2.31M (0%) · correct · discarded`.
+- **Cross-links:** curved, labeled in mono 10px at the midpoint on a scope-colored backing so the label stays legible. Real runs have few explicit links, so also draw an **implicit `same region` link** (1px dotted, no label until hover) between hypotheses that share a `code_region.symbol` (e.g. H6 ↔ H9 on `PROJECTION p_src`). It makes "learned from a failure" visible.
+- **Focus:** clicking a card dims everything except its evidence, links and topic. The ledger scrolls to it.
+- **Query citations:** cited nodes get the signal ring and a numbered chip matching `[1]` in the answer. The canvas pans and zooms to fit them (400ms, `--ease-in-out`).
+
+### Belief timeline + scrubber
+- X axis is time or seq. Each hypothesis is a 1.5px line in its topic color, starting at its proposal at the stated prior (a hollow dot marks the prediction) and stepping at each experiment. Confirmed lines end in a mint dot. Refuted lines **fall to 0 and stop** in coral, which is the "beliefs rising and collapsing" moment. Gate blocks are amber diamonds on the baseline.
+- Below it sits a 6px **activity strip** of `agent_action` ticks (slate; lime for the newest).
+- The scrubber is a 1px ink track with a 12px handle. Dragging tweens the whole UI. The `LIVE` badge shows only when the handle is at the head; drag away and it becomes `REPLAY · seq 54`, plus a mono `→ live` jump link.
+
+### Metric staircase & the "before" view
+- **Before (the demo hook):** the plain autoresearch view. A keep/discard dot chart of `read_rows` per experiment: mint filled dots for kept, hollow for discarded, with a step line for best-so-far on a log y-axis. No hypotheses, no words. It's deliberately flat.
+- **Transition, Before → Graph:** each dot **flies** to its experiment position in the belief graph (600ms, `--ease-in-out`, 30ms stagger), then cards and links fade in around them. It's the single "wow" transition. Build it with shared ids and a FLIP tween.
+- In the Graph tab, the staircase shrinks to a 48px-high sparkline in the ledger header, with each step labeled by the hypothesis that caused it.
+
+### Ledger
+A hairline-separated list on white, one row per hypothesis, newest first. Each row has: id, topic dot, a one-line claim, the mini prediction-vs-belief bar, and a status chip. Expanding a row shows reason → prediction → experiments (mono deltas) → the agent's interpretation notes → closing summary, as a vertical chain with 1px connectors. *Reason* and *note* text come from the agent (sans), and *numbers* come from the harness (mono). That separation is principle §3.2 made visible, so keep it strict.
+
+### Query box & answer
+- In the nav, a 40px input with 6px radius and 1px line, placeholder `Ask the run: why did you give up on H6?`, and mono `⌘K`.
+- The answer streams into the top of the ledger panel at ~45 chars/s with a lime caret. Citations `[1]` are signal-colored chips that hover-link to nodes. Unknown ids are dropped silently (PLAN §4.8).
+
+### Heatmap tab
+- The files (`schema.sql`, `queries/*.sql`) are rendered as mono code on white, with line numbers muted.
+- Each region (clause or symbol) gets a background tint. **Hue** is the topic color of the hypotheses that touched it, and **intensity** is the impact (sum of kept `read_rows` reduction), on a 5-step scale from 0% to 32% alpha. Touch count is a mono badge in the gutter.
+- Regions touched only by refuted hypotheses get a coral hatch instead, as in "tried here, didn't help".
+- Clicking a region lists its hypotheses. Tints tween as the scrubber moves.
+
+### Event row (secondary)
+Height 32px; 13px mono: `time` · dot · event · detail · value. Use it only in debug/expanded views and as the raw "what was it doing" list behind the activity strip. Never as a hero.
+
+### Loop illustration (landing)
+The orbit diagram stays, relabeled to the real loop: `PREDICT` (inner), `MEASURE` (middle), `UPDATE` (outer), with `GATE` at the center. Nothing reaches `MEASURE` without passing the gate.
 
 ### Chips / tags
 3px radius, 12px mono, padding `2px 8px`, 1px line. Event-type chips have an 6px color dot inside. Status chips: `PASS` mint fill, `WARN` amber fill, `DENIED` coral fill, all with ink text.
@@ -234,6 +338,8 @@ CTA buttons, pricing, testimonials, logo strips, FAQ accordions, "book a demo", 
 
 ## 8. Voice
 - Sentence case. Labels are mono uppercase.
+- **Beliefs, not tool calls.** Glassbox is not an LLM tracing product (Langfuse, Braintrust). Don't use "trace", "span" or "observability" in the UI. The vocabulary is *hypothesis, prediction, evidence, belief, confirmed / refuted, topic, gate*.
+- Agent words vs harness numbers: anything the agent said is quoted sans text. Anything the harness measured is mono. Never mix the two in one string.
 - Describe, don't sell: `Hypothesis opened.` beats `Supercharge your agents.`
 - Prefer real (or clearly `SAMPLE`) values over adjectives.
 - Headlines end with a period. Keep them under 8 words.
@@ -243,6 +349,10 @@ CTA buttons, pricing, testimonials, logo strips, FAQ accordions, "book a demo", 
 ## 9. Implementation
 
 Tokens live in `web/src/app/globals.css` (`:root` + Tailwind v4 `@theme inline`). Tailwind names are `ink`, `frost`, `mist`, `line`, `muted`, `subtle`, `scope`, `scope-raised`, `scope-text`, `scope-muted`, `signal`, `live`, `cobalt`, `cyan`, `violet`, `mint`, `ice`, `slate`, `success`, `warning`, `danger`, `warn-fill`, `danger-fill`. Keyframes and motion utility classes (`.anim-pulse`, `.anim-scan`, `.anim-marquee`, `.anim-caret`, `.anim-row-in`, `.anim-shake`, `.reveal`) are in `globals.css` too. Each one respects reduced motion and `[data-paused]`.
+
+**Libraries (PLAN §5):** use `@xyflow/react` for the graph with custom `nodeTypes`/`edgeTypes` only, and import none of xyflow's default CSS beyond the base. Use `elkjs` (`layered`, direction RIGHT, topic hulls as compound nodes) for layout, and animate between ELK layouts with a position tween rather than a re-render jump. Use `recharts` for the timeline and staircase, with custom ticks in mono, no default tooltip styling, and `isAnimationActive` off (we drive the tweens ourselves from `seq`).
+
+**Data:** UI components take `GraphState` from `buildGraph(events, upToSeq)`. Landing/specimen visuals should replay a real recorded run (`runs/bg2/events.jsonl`) labeled `SAMPLE`, rather than invented data.
 
 Class recipes:
 
@@ -269,4 +379,7 @@ section     px-4 py-14 md:px-10 md:py-24
 - [ ] Lime appears only on things that are live right now.
 - [ ] Everything still reads with `prefers-reduced-motion: reduce`, and loops pause offscreen.
 - [ ] Only transform, opacity, filter and stroke properties are animated.
-- [ ] Simulated data is labeled `SAMPLE`.
+- [ ] Simulated or replayed data is labeled `SAMPLE` / `REPLAY`.
+- [ ] Every hypothesis shows its **prediction** (dashed) before its result (solid).
+- [ ] Agent-stated text is sans and harness numbers are mono.
+- [ ] In the app, every motion traces back to an event or the scrubber.
