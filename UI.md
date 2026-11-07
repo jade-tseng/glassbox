@@ -343,11 +343,124 @@ CTA buttons, pricing, testimonials, logo strips, FAQ accordions, "book a demo", 
 - Agent words vs harness numbers: anything the agent said is quoted sans text. Anything the harness measured is mono. Never mix the two in one string.
 - Describe, don't sell: `Hypothesis opened.` beats `Supercharge your agents.`
 - Prefer real (or clearly `SAMPLE`) values over adjectives.
-- Headlines end with a period. Keep them under 8 words.
+- Headlines end with a period. Aim for under 8 words; a contrast headline ("X shows what. Y shows why.") may run to 10.
+- Each section may have **one context paragraph of at most 3 sentences** (≤ 65ch per line). Explaining the problem isn't marketing; selling is. See §9 for the exact copy.
 
 ---
 
-## 9. Implementation
+## 9. Copy & story
+
+This section fixes **what the page says and in what order**, not how it looks. Components stay as specified in §7. Text in quotes is the copy to ship; *italic notes* explain intent. When the run or data changes, keep the structure and swap the numbers.
+
+### 9.1 The story in one breath
+Agents can now run research loops by themselves. What they leave behind is a scoreboard, not a line of reasoning. Glassbox makes the agent say what it believes before each experiment, lets a harness measure what actually happened, and shows the beliefs moving. That's how you judge an agent's research, and the environment it was scored in.
+
+*Glassbox is general: any task with a fixed verifier (a codebase + a benchmark, a dataset + an eval) can be the input. ClickHouse is just the first target. Don't say "RL environment" in the hero; save it for the closing section.*
+
+### 9.2 Page order (the narrative arc)
+| # | Section | Job | Reader leaves knowing |
+|---|---|---|---|
+| 0 | Hero | Name the gap, state what Glassbox does | "Autoresearch hides the reasoning; this shows it." |
+| 1 | `00 / Context` | Problem + research taste | Why reasoning matters more than the score |
+| 2 | `01 / The run` | Set up the input: task, verifier, **main hypothesis** | What this agent was trying to prove |
+| 3 | `02 / Beliefs` | Before → beliefs reveal; the sub-hypotheses | What it believed, tested, dropped and learned |
+| 4 | `03 / Impact` | What mattered, and how well calibrated it was | Which ideas paid off; whether its confidence meant anything |
+| 5 | `04 / Loop` | The rule that makes it trustworthy | Predict → measure → update, enforced by a gate |
+| 6 | `05 / Why it matters` | RL-environment framing + how it works underneath | Why environment builders should care, and that it's real |
+
+### 9.3 Hero
+- Headline: "Autoresearch shows what worked. Glassbox shows why."
+- Body (keep verbatim): "Glassbox plugs into an agent's research loop. Before every experiment, the agent must state a hypothesis and a prediction. The harness measures the result, and you see what it believed, what happened, and what it learned."
+- Label row: `PREDICT · MEASURE · UPDATE`
+- Instrument header: `REAL RUN · REPLAYED` (never `bg2` or other internal ids)
+- Instrument caption: "Claude Code tuning a ClickHouse schema on 2M rows of web-analytics data. Goal: scan fewer rows, same results."
+- Metric label: `ROWS SCANNED`, with the sub-label "lower is better · from 20,000,000"
+
+### 9.4 `00 / Context` (problem + research taste)
+- Headline: "A scoreboard isn't a research log."
+- Body: "Agents can now run research loops on their own: change something, run the benchmark, keep or revert, repeat. What they leave behind is a list of experiments that stuck. It doesn't say what the agent expected, why it tried each idea, or what the failures taught it."
+- Second beat, research taste: "The open question is no longer whether agents can do the engineering of research. It's whether they have research taste: choosing which ideas are worth testing, predicting what will happen, and changing their mind when they're wrong. Taste doesn't show up on a leaderboard. It shows up in the reasoning."
+- Three mono facts, as a hairline row:
+  - `AUTORESEARCH GIVES YOU` "keep / discard"
+  - `GLASSBOX ADDS` "hypothesis → prediction → measured result → belief"
+  - `ENFORCED BY` "a gate: no benchmark runs without a stated prediction"
+
+*Don't name people or papers in the research-taste lines. Keep it about the question, not the debate's participants.*
+
+### 9.5 `01 / The run`: lay out the main hypothesis first
+Whenever a run starts (live or replayed), the **first thing shown is the main hypothesis**: the claim the whole run is trying to establish, before any sub-hypothesis appears. Everything after it is framed as "the hypotheses we're testing on the way".
+
+Structure, top to bottom:
+1. `MAIN HYPOTHESIS`: one sentence, phrased as a falsifiable claim, not a goal.
+2. `TASK`: what the agent may change.
+3. `VERIFIER`: what measures success, and what counts as failure.
+4. `BASELINE` → `TARGET`: numbers in mono.
+5. Then: "On the way, the agent proposes smaller hypotheses. Each one must carry a prediction before it's tested." This leads into §9.6.
+
+Copy for the ClickBench target (`target/program.md`):
+- Main hypothesis: "This dashboard's 10 queries can return exactly the same results while scanning a small fraction of the 20,000,000 rows they scan today."
+- Task: "Change the table definition (`schema.sql`) and rewrite queries (`queries/*.sql`). Nothing else."
+- Verifier: "The harness rebuilds the table, runs every query, and reads rows scanned from ClickHouse's own query log. Any changed result, SQL error or timeout is a failure, never a win."
+- Baseline/target: `20,000,000 rows` → `as low as it goes, same answers`
+- Closing line (after the run ends): "Verdict: supported. 20.0M → 0.96M rows scanned (−95%), all results identical, across 25 experiments and 22 hypotheses."
+
+*Data note: the event log has no main-hypothesis field yet. Until `run_started` carries one (e.g. `goal` / `main_hypothesis`), derive it from the target's `program.md`. Its verdict is computed from the metric, not stated by the agent.*
+
+### 9.6 `02 / Beliefs`: the hypotheses tested on the way
+- Headline: "Same run. Now with its reasoning."
+- How-to-read line, shown once above the graph: "Start on Before: that's what autoresearch normally shows. Switch to Beliefs: each dot becomes evidence for a hypothesis. ┆ is what the agent predicted; ▬ is what the measurements say now."
+- Tab labels: "Before · what worked" / "Beliefs · why"
+- Topic hulls keep the agent's topic names (they're its own words).
+- Card status words: `OPEN`, `CONFIRMED`, `REFUTED`, `ABANDONED`.
+- The "tension" marker is called **"Claimed, not shown"**. Inspector text: "The agent marked this confirmed. The measurements don't back it."
+- Inspector field labels: `WHY IT TRIED THIS (agent)`, `PREDICTION`, `WHAT THE NUMBERS SAY (harness)`, `EVIDENCE`, `WHAT IT CONCLUDED (agent)`. The *(agent)* and *(harness)* tags are deliberate. They teach the reader whose words are whose.
+- Timeline title: "How its beliefs moved". Caption: "Each line starts at the agent's prediction. Refuted ideas fall to zero."
+
+### 9.7 `03 / Impact`
+- Headline: "Which ideas actually paid off."
+- Lead sentence, computed from data: "One line, the ORDER BY, accounts for {12.4M} of the {19.0M} rows saved."
+- Calibration: "When it was confident (≥ 0.7), it was right {5} of {5} times. Across all tested predictions: {11} of {20}."
+- *Always show one computed insight sentence above a chart. Never ship a chart with only a label.*
+
+### 9.8 `04 / Loop`
+- Headline: "No measurement without a prediction."
+- Body: "The agent states what it expects. A hook blocks the benchmark until it does. The harness, not the agent, reports the numbers, and the belief moves."
+- Orbit labels stay `PREDICT` / `MEASURE` / `UPDATE` with `GATE` at the center.
+
+### 9.9 `05 / Why it matters`: two levels
+**Level 1, the argument (keep verbatim):**
+- Headline: "Pass/fail says whether. Beliefs say how."
+- Body: "Every autoresearch loop is an RL environment: a task, a state, and a verifier. When a score jumps and no hypothesis explains it, or a claim is confirmed that the numbers don't support, that's the signal environment builders need. Every belief here was stated before the experiment, measured by the harness, and can be replayed."
+
+**Level 2, how it works underneath** (mono labels, sans text, one line each, as a hairline list under the argument):
+- `TOOLS`: "The agent gets five tools: propose a hypothesis (claim, reason, predicted direction, confidence 0–1, the code it'll touch), link it to earlier ones (refines, depends on, contradicts), record what it learned, close it, and read its current beliefs."
+- `GATE`: "A pre-tool hook denies any benchmark run until a hypothesis with a prediction is armed. A second hook blocks edits outside the allowed files."
+- `HARNESS`: "The evaluator rebuilds the data, runs the queries, and checks every result against the baseline hash. The agent can't edit it, and it never reports its own numbers."
+- `EVENT LOG`: "Every proposal, result, block and conclusion is an append-only, sequence-numbered event, mirrored to a database. That's what makes any run replayable to the exact step."
+- `BELIEF MATH`: "Confidence starts from the agent's stated prior and updates with each measured result, weighted by how much the metric moved. Moves under 1% count as weak, and invalid runs count as no evidence. It's deterministic, with no model in the loop."
+- `DROP-IN`: "It runs inside Claude Code via the Agent SDK; other agents can use the same tools."
+
+*Claim discipline: say "the signal you'd need". Never say "we detect reward hacking" (PLAN §1b).*
+
+### 9.10 Glossary (first use on the page gets the plain gloss)
+| Term in data | Say in prose | Gloss |
+|---|---|---|
+| `read_rows` | rows scanned | "how much data the dashboard reads; lower is better" |
+| `hypothesis` | hypothesis | "a specific, testable claim with a predicted outcome" |
+| `prediction.confidence` | prediction | "how sure the agent was, before testing" |
+| belief / posterior | belief | "how well the measurements back the claim now" |
+| `kept` / `discarded` | kept / discarded | the change stayed in, or was reverted |
+| `invalid` / `incorrect_result` | failed | "faster but wrong, or broken; never counts as a win" |
+| tension | claimed, not shown | agent says confirmed, numbers disagree |
+| run id (`bg2`) | *never shown* | use "real run · replayed" |
+| `gate_blocked` | blocked by the gate | "tried to benchmark without a prediction" |
+
+### 9.11 Words
+- Use: hypothesis, prediction, evidence, belief, verifier, harness, research taste, replay.
+- Avoid: trace, span, observability (§8), "AI-powered", "insights", "supercharge", "magic", and any claim of detection or guarantees.
+- Numbers: always real or labeled `REPLAY` / `SAMPLE`. Format large counts with separators (`20,000,000`) in prose, and abbreviate (`20.0M`) in labels.
+
+## 10. Implementation
 
 Tokens live in `web/src/app/globals.css` (`:root` + Tailwind v4 `@theme inline`). Tailwind names are `ink`, `frost`, `mist`, `line`, `muted`, `subtle`, `scope`, `scope-raised`, `scope-text`, `scope-muted`, `signal`, `live`, `cobalt`, `cyan`, `violet`, `mint`, `ice`, `slate`, `success`, `warning`, `danger`, `warn-fill`, `danger-fill`. Keyframes and motion utility classes (`.anim-pulse`, `.anim-scan`, `.anim-marquee`, `.anim-caret`, `.anim-row-in`, `.anim-shake`, `.reveal`) are in `globals.css` too. Each one respects reduced motion and `[data-paused]`.
 
@@ -371,8 +484,10 @@ section     px-4 py-14 md:px-10 md:py-24
 
 ---
 
-## 10. Checklist before shipping any screen
+## 11. Checklist before shipping any screen
 - [ ] No CTA buttons, sign-up prompts or marketing copy.
+- [ ] The page follows the §9 story order, and a run opens with its main hypothesis.
+- [ ] Internal ids (`bg2`, raw event names) never appear in prose.
 - [ ] Palette is frost/white/graphite plus the cool signal palette. No cream, no vermillion, no earthy tones.
 - [ ] Panels have a 6px radius, there are no pills, and there are no shadows.
 - [ ] Labels and numbers are in Geist Mono, and numbers use tabular figures.

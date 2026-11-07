@@ -50,7 +50,7 @@ export function Inspector({ focus }: { focus: string | null }) {
 
       <dl className="mt-4 space-y-3 text-[13px] leading-5">
         <div>
-          <dt className="font-mono text-[11px] uppercase tracking-[0.08em] text-scope-muted">Reason (agent)</dt>
+          <dt className="font-mono text-[11px] uppercase tracking-[0.08em] text-scope-muted">Why it tried this (agent)</dt>
           <dd className="mt-0.5 text-scope-text/85">{h.reason}</dd>
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -61,7 +61,7 @@ export function Inspector({ focus }: { focus: string | null }) {
             </dd>
           </div>
           <div>
-            <dt className="font-mono text-[11px] uppercase tracking-[0.08em] text-scope-muted">Belief (harness)</dt>
+            <dt className="font-mono text-[11px] uppercase tracking-[0.08em] text-scope-muted">What the numbers say (harness)</dt>
             <dd className="mt-0.5 font-mono tabular-nums" style={{ color: h.belief >= h.prior ? STATUS.supports : STATUS.refutes }}>
               {h.belief.toFixed(2)}
             </dd>
@@ -99,13 +99,14 @@ export function Inspector({ focus }: { focus: string | null }) {
         )}
         {h.summary && (
           <div>
-            <dt className="font-mono text-[11px] uppercase tracking-[0.08em] text-scope-muted">Closed (agent)</dt>
+            <dt className="font-mono text-[11px] uppercase tracking-[0.08em] text-scope-muted">What it concluded (agent)</dt>
             <dd className="mt-0.5 text-scope-text/85">{h.summary}</dd>
           </div>
         )}
         {tension && (
           <p className="rounded-[3px] border border-warn-fill/40 px-2.5 py-1.5 text-[12px] text-warn-fill">
-            Tension: the agent marked this confirmed, but the measured evidence doesn&apos;t back it.
+            <span className="font-mono uppercase tracking-[0.08em]">Claimed, not shown.</span> The agent marked this
+            confirmed. The measurements don&apos;t back it.
           </p>
         )}
       </dl>

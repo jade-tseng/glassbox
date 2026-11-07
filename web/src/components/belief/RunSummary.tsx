@@ -44,7 +44,7 @@ export function Staircase({ height = 120 }: { height?: number }) {
 }
 
 export function HeroInstrument() {
-  const { state, runId } = useReplay();
+  const { state } = useReplay();
   const hyps = state.order.map((id) => state.hypotheses[id]);
   const refuted = hyps.filter((h) => h.status === "refuted").length;
   const label = "font-mono text-[12px] uppercase tracking-[0.08em] text-scope-muted";
@@ -52,17 +52,20 @@ export function HeroInstrument() {
     <div className="relative overflow-hidden rounded-[6px] border border-scope-line bg-scope text-scope-text">
       <div className="flex h-9 items-center justify-between border-b border-scope-line px-4 font-mono text-[12px] uppercase tracking-[0.08em] text-scope-muted">
         <span className="flex items-center gap-2">
-          <PulseDot size={6} /> replay · run {runId}
+          <PulseDot size={6} /> real run · replayed
         </span>
-        <span>clickbench · read_rows</span>
+        <span className="hidden sm:inline">clickhouse · clickbench</span>
       </div>
       <Paused className="relative overflow-hidden px-4 pt-4">
         <Scanline distance={150} />
-        <p className={label}>Best so far</p>
+        <p className="text-[13px] leading-5 text-scope-text/85">
+          Claude Code tuning a ClickHouse schema on 2M rows of web-analytics data. Goal: scan fewer rows, same results.
+        </p>
+        <p className={`mt-4 ${label}`}>Rows scanned</p>
         <p className="mt-1 text-[36px] tracking-[-0.04em] md:text-[40px]">
           <CountUp value={state.best} />
-          <span className="ml-2 text-[14px] tracking-normal text-scope-muted">from 20,000,000</span>
         </p>
+        <p className="font-mono text-[12px] text-scope-muted">lower is better · from {state.baseline.toLocaleString("en-US")}</p>
         <div className="mt-3 pb-3">
           <Staircase height={130} />
         </div>
@@ -182,5 +185,83 @@ export function HypothesisMarquee() {
         );
       })}
     </Marquee>
+  );
+}
+
+/** Rows saved per code region (kept, correct, improving experiments only). */
+function savedByRegion(state: ReturnType<typeof useReplay>["state"]) {
+  const out = new Map<string, number>();
+  for (const id of state.order) {
+    const h = state.hypotheses[id];
+    const region = h.symbol.replace(/^SETTINGS\s+/, "") || h.file;
+    for (const eid of h.experiments) {
+      const e = state.experiments[eid];
+      if (e.after !== null && e.correct && e.kept && e.after < e.before) out.set(region, (out.get(region) ?? 0) + e.before - e.after);
+    }
+  }
+  return out;
+}
+
+/** One computed insight sentence above the impact chart (UI.md §9.7). */
+export function ImpactLead() {
+  const { state } = useReplay();
+  const saved = savedByRegion(state);
+  const total = state.baseline - state.best;
+  const top = [...saved.entries()].sort((a, b) => b[1] - a[1])[0];
+  if (!top || total <= 0) return <>Waiting for the first kept experiment.</>;
+  const share = top[1] / total;
+  return (
+    <>
+      {share >= 0.5 ? "One change" : "The biggest single change"}, the <span className="font-mono">{top[0]}</span>, accounts for{" "}
+      <span className="font-mono">{fmtRows(top[1])}</span> of the <span className="font-mono">{fmtRows(total)}</span> rows saved.
+    </>
+  );
+}
+
+export function CalibrationLead() {
+  const { state } = useReplay();
+  const tested = state.order.map((id) => state.hypotheses[id]).filter((h) => h.experiments.some((e) => state.experiments[e].evidence !== "invalid"));
+  const held = tested.filter((h) => h.belief >= 0.5).length;
+  const confident = tested.filter((h) => h.firstPrior >= 0.7);
+  const confHeld = confident.filter((h) => h.belief >= 0.5).length;
+  if (!tested.length) return <>No predictions tested yet.</>;
+  return (
+    <>
+      {confident.length > 0 && (
+        <>
+          When it was confident (≥ 0.7), it was right <span className="font-mono">{confHeld}</span> of{" "}
+          <span className="font-mono">{confident.length}</span> times.{" "}
+        </>
+      )}
+      Across all tested predictions: <span className="font-mono">{held}</span> of <span className="font-mono">{tested.length}</span>.
+    </>
+  );
+}
+
+/** Verdict on the main hypothesis, computed from the metric (never stated by the agent). */
+export function RunVerdict() {
+  const { state, final, index, events } = useReplay();
+  const done = index >= events.length - 1;
+  const exps = state.expOrder.length;
+  const anyKept = state.best < state.baseline;
+  const pct = Math.round((1 - state.best / state.baseline) * 100);
+  const nHyp = state.order.length;
+  if (!done) {
+    return (
+      <span>
+        <span className="font-mono uppercase tracking-[0.08em] text-muted">Testing · </span>
+        best so far <span className="font-mono">{fmtRows(state.best)}</span> rows scanned after{" "}
+        <span className="font-mono">{exps}</span> of <span className="font-mono">{final.expOrder.length}</span> experiments.
+      </span>
+    );
+  }
+  return (
+    <span>
+      <span className="font-mono uppercase tracking-[0.08em] text-success">{anyKept ? "Supported. " : "Not supported. "}</span>
+      <span className="font-mono">{(state.baseline / 1e6).toFixed(1)}M</span> →{" "}
+      <span className="font-mono">{(state.best / 1e6).toFixed(2)}M</span> rows scanned
+      (−{pct}%), all results identical, across <span className="font-mono">{exps}</span> experiments and{" "}
+      <span className="font-mono">{nHyp}</span> hypotheses.
+    </span>
   );
 }

@@ -10,18 +10,23 @@ import { Inspector } from "./Inspector";
 import { STATUS } from "./layout";
 
 const TABS = [
-  { id: "before", label: "Before · keep/discard" },
-  { id: "beliefs", label: "Beliefs" },
+  { id: "before", label: "Before · what worked" },
+  { id: "beliefs", label: "Beliefs · why" },
 ] as const;
 
 export function BeliefSection() {
-  const [mode, setMode] = useState<"before" | "beliefs">("beliefs");
+  const [mode, setMode] = useState<"before" | "beliefs">("before");
   const [focus, setFocus] = useState<string | null>(null);
 
   return (
     <div className="flex flex-col gap-6">
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0">
+          <p className="mb-5 max-w-[68ch] text-[14px] leading-6 text-scope-text/85">
+            Start on Before: that&apos;s what autoresearch normally shows. Switch to Beliefs: each dot becomes evidence
+            for a hypothesis. <span className="font-mono text-scope-text">┆</span> is what the agent predicted;{" "}
+            <span className="font-mono text-scope-text">▬</span> is what the measurements say now.
+          </p>
           <div role="tablist" className="relative mb-4 flex gap-6 border-b border-scope-line font-mono text-[12px] uppercase tracking-[0.08em]">
             {TABS.map((t) => (
               <button
@@ -50,12 +55,12 @@ export function BeliefSection() {
                 <rect x="1" y="4" width="15" height="4" fill="#E6EAEC" />
                 <line x1="19" x2="19" y1="1" y2="11" stroke="#E6EAEC" strokeDasharray="2 1.5" />
               </svg>
-              belief vs prediction
+              measured vs predicted
             </li>
             <li className="flex items-center gap-2"><Dot fill={STATUS.supports} /> kept</li>
             <li className="flex items-center gap-2"><Dot fill="transparent" stroke="#7C8B98" /> discarded</li>
             <li className="flex items-center gap-2"><Dot fill={STATUS.refutes} /> failed / invalid</li>
-            <li className="flex items-center gap-2"><span className="h-1 w-1 bg-warn-fill" /> agent ≠ harness</li>
+            <li className="flex items-center gap-2"><span className="h-1 w-1 bg-warn-fill" /> agent ≠ harness · ▼ claimed, not shown</li>
             <li className="flex items-center gap-2">
               <svg width="20" height="6" aria-hidden><line x1="0" y1="3" x2="20" y2="3" stroke="#A9C7FF" strokeDasharray="2 3" /></svg>
               same code region

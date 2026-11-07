@@ -29,7 +29,12 @@ export function BeliefTimeline({ focus, onFocus }: { focus: string | null; onFoc
   return (
     <div className="rounded-[6px] border border-line bg-white">
       <div className="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-[12px] uppercase tracking-[0.08em] text-muted">
-        <span>Belief timeline</span>
+        <span>
+          How its beliefs moved
+          <span className="ml-3 hidden normal-case tracking-normal md:inline">
+            Each line starts at the agent&apos;s prediction. Refuted ideas fall to zero.
+          </span>
+        </span>
         <span className="flex items-center gap-3 normal-case tracking-normal">
           <span className="inline-flex items-center gap-1.5">
             <svg width="14" height="8" aria-hidden><circle cx="4" cy="4" r="3" fill="white" stroke="currentColor" /></svg> prediction

@@ -96,7 +96,7 @@ export function BeliefGraph({
           </g>
         ))}
         <text x={chart.x0} y={14} className="font-mono" fontSize={11} letterSpacing="0.08em" fill="#8A949A">
-          READ_ROWS (LOG) · BEST SO FAR
+          ROWS SCANNED (LOG SCALE) · BEST SO FAR
         </text>
         <text x={chart.x1} y={H - 14} textAnchor="end" className="font-mono" fontSize={11} letterSpacing="0.08em" fill="#8A949A">
           EXPERIMENTS →
