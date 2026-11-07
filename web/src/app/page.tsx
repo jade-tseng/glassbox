@@ -28,10 +28,10 @@ export default function Home() {
         {/* Nav */}
         <header className="sticky top-0 z-20 border-b border-scope-line bg-scope text-scope-text">
           <nav className="mx-auto flex h-14 max-w-[1200px] items-center justify-between px-4 md:px-10">
-            <span className="flex items-center gap-2 text-[18px] font-medium tracking-[-0.02em]">
+            <Link href="/" className="flex items-center gap-2 text-[18px] font-medium tracking-[-0.02em]">
               <GlassCube size={18} stroke="var(--color-scope-text)" />
               glassbox
-            </span>
+            </Link>
             <Link href="/run" className="font-mono text-[12px] uppercase tracking-[0.08em] text-scope-muted transition-colors duration-150 hover:text-scope-text">
               Runs
             </Link>

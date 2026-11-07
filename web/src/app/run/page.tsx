@@ -83,7 +83,7 @@ export default function TrackerPage() {
     <div className="min-h-screen bg-frost text-ink">
       <header className="sticky top-0 z-20 border-b border-line bg-frost">
         <nav className="mx-auto flex h-14 max-w-[1440px] items-center justify-between px-4 md:px-10">
-          <span className="text-[18px] font-medium tracking-[-0.02em]">glassbox</span>
+          <Link href="/" className="text-[18px] font-medium tracking-[-0.02em]">glassbox</Link>
           <span className="flex items-center gap-2 font-mono text-[12px] uppercase tracking-[0.08em] text-muted">
             <Dot live={live > 0} /> {live} live · {runs?.length ?? 0} runs
           </span>
