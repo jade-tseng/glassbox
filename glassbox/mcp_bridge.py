@@ -1,10 +1,10 @@
 """Glassbox MCP bridge: give ANY MCP-capable agent (Claude Code, Codex, Gemini CLI, ...) the belief tools,
 streaming to a Glassbox deployment through the ingest API. No hooks needed in the agent.
 
-  GLASSBOX_RUN_ID=my-run uv run --project <glassbox> python -m glassbox.mcp_bridge      # stdio MCP server
+  GLASSBOX_RUN_ID=my-run uv run --directory <glassbox> python -m glassbox.mcp_bridge    # stdio MCP server
 
 Register it in your agent's MCP config, e.g. Claude Code:
-  {"mcpServers": {"glassbox": {"command": "uv", "args": ["run", "--project", "/path/to/glassbox",
+  {"mcpServers": {"glassbox": {"command": "uv", "args": ["run", "--directory", "/path/to/glassbox",
       "python", "-m", "glassbox.mcp_bridge"], "env": {"GLASSBOX_RUN_ID": "my-run"}}}}
 
 Without hooks, Glassbox can't measure the agent's experiments itself, so `report_experiment` numbers are
