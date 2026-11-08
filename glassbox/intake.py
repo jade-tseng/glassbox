@@ -21,7 +21,7 @@ from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, TextBlock, qu
 from .cases import CASES, validate
 from .events import ROOT
 
-DEFAULT_BUDGET = {"max_experiments": 10, "backend": "anthropic", "model": "sonnet", "budget_usd": 5}
+DEFAULT_BUDGET = {"max_experiments": 10, "backend": "anthropic", "model": "claude-opus-5-5", "budget_usd": 15}
 
 INSTRUCTIONS = """You set up Glassbox research runs. A user described, in their own words, something they want an AI
 agent to improve. Turn it into a case spec, asking the user ONLY about things that are missing or ambiguous.
@@ -36,7 +36,7 @@ Case spec (JSON):
               "timeout_s": 300},
   "metric": {"label": "what the number is", "unit": "s / ms / % / ...", "direction": "lower" | "higher"},
   "verify": {"mode": "test_command" | "json_flag" | "same_output" | "none", "command": "...", "key": "..."},
-  "budget": {"max_experiments": 10, "backend": "anthropic" | "meta", "model": "sonnet", "budget_usd": 5},
+  "budget": {"max_experiments": 10, "backend": "anthropic" | "meta", "model": "claude-opus-5-5", "budget_usd": 15},
   "evidence": {"commands": ["python3 traces.py"], "description": "what the agent can look at"},   # optional
   "hidden": ["heldout/", "evaluate.py"]                                                           # optional
 }
@@ -63,6 +63,8 @@ How to work:
 - Ask at most 3 questions, short and concrete, each with a suggested answer when you have one. Don't ask about
   things you could find in the code or that have sensible defaults (budget defaults are fine unless the user said otherwise).
 - When the user answers, update the spec accordingly and only ask what is still unresolved.
+- Model: default anthropic + claude-opus-5-5 (budget_usd 15). If the user asks for Sonnet use "sonnet" (budget 5);
+  for Muse Spark / Meta use backend "meta" + model "muse-spark-1.3". Never ask about the model; use the default.
 
 Finish with ONLY this JSON in a ```json fenced block:
 {"summary": "2-3 sentences in plain words: what will be optimized, how it is measured, how correctness is checked",
