@@ -15,7 +15,10 @@ export const INTENTS = {
 } as const;
 export type Intent = keyof typeof INTENTS;
 
-export type AnswerItem = { id: string; kind: "hypothesis" | "experiment"; title: string; lines: string[]; relevance: number };
+/** Every answer line says where it came from: observed (harness), agent (its words), glassbox (inferred). */
+export type Provenance = "observed" | "agent" | "glassbox";
+export type AnswerLine = { kind: Provenance; text: string };
+export type AnswerItem = { id: string; kind: "hypothesis" | "experiment"; title: string; lines: AnswerLine[]; relevance: number };
 export type Answer = { lead: string; items: AnswerItem[]; cited: string[]; intent: Intent; focus: string | null };
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
@@ -24,26 +27,33 @@ export const rows = (n: number | null) =>
 
 function expLine(e: ExperimentNode, metric: string): string {
   if (!e.correct) return `${e.id}: ${e.errorKind}${e.errorMessage ? ` (${e.errorMessage.slice(0, 140)})` : ""}`;
-  const rel = e.rawChange === null ? "" : ` (${e.rawChange <= 0 ? "−" : "+"}${Math.abs(e.rawChange * 100).toFixed(1)}%)`;
+  const rel =
+    e.rawChange === null ? "" : Math.abs(e.rawChange) < 0.0005 ? " (0%)" : ` (${e.rawChange < 0 ? "−" : "+"}${Math.abs(e.rawChange * 100).toFixed(1)}%)`;
   return `${e.id}: ${metric} ${rows(e.metricBefore)} → ${rows(e.metricAfter)}${rel}, ${e.outcome}${e.measuredBy === "client" ? " (client-reported)" : ""}`;
 }
 
 function hypItem(h: HypothesisNode, g: GraphState, relevance: number): AnswerItem {
   const exps = h.tests.map((id) => g.experiments.find((e) => e.id === id)).filter(Boolean) as ExperimentNode[];
-  const lines = [
-    `Claim: ${h.claim}`,
-    `Status ${h.status}; confidence ${pct(h.prediction.confidence)} stated → ${pct(h.confidence)} after evidence (predicted ${g.task.metric.label} ${h.prediction.direction.replace("_", " ")}).`,
-    `Why the agent thought so: ${h.reason}`,
-    ...exps.map((e) => `${expLine(e, g.task.metric.label)}${e.note ? ` — agent: “${e.note}”` : ""}`),
+  const lines: AnswerLine[] = [
+    { kind: "agent", text: `Claimed: ${h.claim}` },
+    { kind: "agent", text: `Predicted ${g.task.metric.label} would ${h.prediction.direction.replace("_", " ")}, ${pct(h.prediction.confidence)} sure, because: ${h.reason}` },
   ];
-  if (h.summary) lines.push(`Closing summary: “${h.summary}”`);
+  for (const e of exps) {
+    lines.push({ kind: "observed", text: expLine(e, g.task.metric.label) });
+    if (e.note) lines.push({ kind: "agent", text: `Concluded after ${e.id}: “${e.note}”` });
+  }
+  if (h.summary) lines.push({ kind: "agent", text: `Verdict (${h.status}): “${h.summary}”` });
+  lines.push({ kind: "glassbox", text: `Confidence ${pct(h.prediction.confidence)} stated → ${pct(h.confidence)} after ${exps.length} observation${exps.length === 1 ? "" : "s"}.` });
   return { id: h.id, kind: "hypothesis", title: `${h.id} · ${h.topic}`, lines, relevance };
 }
 
 function expItem(e: ExperimentNode, relevance: number, metric: string): AnswerItem {
-  const lines = [expLine(e, metric), `Tested: ${e.hypothesisIds.join(", ") || "no armed hypothesis"}; files: ${e.filesChanged.join(", ") || "none"}.`];
-  if (e.note) lines.push(`Agent: “${e.note}”`);
-  if (e.disagreement) lines.push(`Note: the agent's keep decision (${e.agentKept}) disagrees with the harness (beats best: ${e.beatsBest}).`);
+  const lines: AnswerLine[] = [
+    { kind: "observed", text: `${expLine(e, metric)}; files: ${e.filesChanged.join(", ") || "none"}` },
+    { kind: "agent", text: `Was testing: ${e.hypothesisIds.join(", ") || "no stated hypothesis"}` },
+  ];
+  if (e.note) lines.push({ kind: "agent", text: `Concluded: “${e.note}”` });
+  if (e.disagreement) lines.push({ kind: "glassbox", text: `The agent's keep decision (${e.agentKept ? "keep" : "revert"}) disagrees with the harness (${e.beatsBest ? "new best" : "not a new best"}).` });
   return { id: e.id, kind: "experiment", title: `${e.id} · ${e.outcome}`, lines, relevance };
 }
 
@@ -101,5 +111,5 @@ function lead(g: GraphState, intent: Intent, hs: HypothesisNode[], es: Experimen
 
 /** Plain text for an LLM rewrite or copy/paste. */
 export function answerText(a: Answer): string {
-  return [a.lead, ...a.items.map((i) => `[${i.id}] ${i.lines.join(" ")}`)].join("\n");
+  return [a.lead, ...a.items.map((i) => `[${i.id}] ${i.lines.map((l) => `(${l.kind}) ${l.text}`).join(" ")}`)].join("\n");
 }

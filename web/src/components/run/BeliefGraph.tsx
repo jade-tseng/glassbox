@@ -180,10 +180,14 @@ function HypothesisCard({
           <Chip className={st.chip}>{st.label}</Chip>
           {stance && <Chip className="border-line text-muted" title="strongest surviving hypothesis in this topic">STANCE</Chip>}
         </div>
-        <span className="font-mono text-[13px] tabular-nums text-ink">{Math.round(h.confidence * 100)}%</span>
+        <span className="font-mono text-[13px] tabular-nums text-signal" title="Glassbox confidence, inferred from the observations">
+          ◆ {Math.round(h.confidence * 100)}%
+        </span>
       </div>
 
-      <p className="mt-2 line-clamp-3 text-[13px] leading-[18px] text-ink">{h.claim}</p>
+      <p className="mt-2 line-clamp-3 border-l-2 border-violet pl-2 text-[13px] leading-[18px] text-ink" title="The agent's claim (its words)">
+        {h.claim}
+      </p>
 
       {/* Confidence: prior tick vs posterior bar */}
       <div className="mt-3">
@@ -194,11 +198,11 @@ function HypothesisCard({
           />
         </div>
         <div className="relative h-2">
-          <span className="absolute top-0 h-2 w-px bg-ink" style={{ left: `${h.prediction.confidence * 100}%` }} title="stated prior" />
+          <span className="absolute top-0 h-2 w-px bg-violet" style={{ left: `${h.prediction.confidence * 100}%` }} title="what the agent said before testing" />
         </div>
         <div className="flex justify-between font-mono text-[11px] text-muted">
           <span>
-            prior {Math.round(h.prediction.confidence * 100)}% · {arrowFor(h.prediction.direction)} {graph.task.metric.short}
+            <span className="text-violet">◇ said {Math.round(h.prediction.confidence * 100)}%</span> · {arrowFor(h.prediction.direction)} {graph.task.metric.short}
           </span>
           {evidence.length > 0 && (
             <span className={delta >= 0 ? "text-success" : "text-danger"}>
@@ -217,13 +221,19 @@ function HypothesisCard({
               <Chip
                 key={e.experiment}
                 className={`${es.cls} ${highlightedExps.has(e.experiment) ? "outline outline-2 outline-offset-1 outline-signal" : ""}`}
-                title={`${e.experiment}: ${es.title}`}
+                title={`● observed ${e.experiment}: ${observedChange(graph, e.experiment)} · ◆ counts as ${es.title}`}
               >
-                {e.experiment} {es.glyph}
+                {e.experiment} {observedChange(graph, e.experiment)} {es.glyph}
               </Chip>
             );
           })}
         </div>
+      )}
+
+      {conflict(h) && (
+        <p className="mt-2 font-mono text-[11px] leading-[15px] text-warning" title="The agent's verdict and the evidence-based confidence disagree">
+          ⚠ {conflict(h)}
+        </p>
       )}
 
       <div className="mt-2 truncate font-mono text-[11px] text-subtle">
@@ -231,4 +241,19 @@ function HypothesisCard({
       </div>
     </button>
   );
+}
+
+/** The observed metric change of an experiment, compact: "−62%", "+3%", "0%", "✕" for rejected runs. */
+function observedChange(g: GraphState, expId: string): string {
+  const e = g.experiments.find((x) => x.id === expId);
+  if (!e || !e.correct || e.rawChange === null) return "✕run";
+  const p = e.rawChange * 100;
+  if (Math.abs(p) < 0.5) return "0%";
+  return `${p < 0 ? "−" : "+"}${Math.abs(p) >= 10 ? Math.round(Math.abs(p)) : Math.abs(p).toFixed(1)}%`;
+}
+
+function conflict(h: HypothesisNode): string | null {
+  if (h.status === "confirmed" && h.confidence < 0.5) return "agent says confirmed; observations don't back it";
+  if (h.status === "refuted" && h.confidence > 0.6) return "agent dropped it; observations mostly supported it";
+  return null;
 }

@@ -3,12 +3,46 @@
 // Hypothesis ledger (PLAN §4.9 right panel). Click a row to select; the selected hypothesis expands with its
 // reason, every experiment that tested it (harness numbers + the agent's note), and the latest diff.
 
-import type { GraphState } from "@/lib/beliefEngine";
+import type { Direction, EvidenceEdge, EvidenceKind, GraphState, HypothesisNode } from "@/lib/beliefEngine";
 import type { HackCheck } from "@/lib/hackChecks";
-import { Chip, EVIDENCE_STYLE, Label, STATUS_STYLE, fmtRows } from "./ui";
+import { Mark, Prov } from "./provenance";
+import { Chip, EVIDENCE_STYLE, Label, STATUS_STYLE, arrowFor, fmtRows } from "./ui";
 import { FLAG_TEXT } from "./useChecks";
 
 const pct = (p: number) => `${Math.round(p * 100)}%`;
+const signedPct = (x: number) => (Math.abs(x) < 0.0005 ? "0%" : `${x < 0 ? "−" : "+"}${Math.abs(x * 100).toFixed(1)}%`);
+
+/** Change in Glassbox confidence caused by the experiment at `seq` (null if it didn't move it). */
+function confidenceDelta(h: HypothesisNode, seq: number): number | null {
+  const i = h.history.findIndex((p) => p.seq === seq);
+  if (i <= 0) return null;
+  return h.history[i].confidence - h.history[i - 1].confidence;
+}
+
+/** Why the observation counts as this kind of evidence, in plain words. */
+function evidenceWhy(kind: EvidenceKind, predicted: Direction, observed: Direction | null): string {
+  const said = predicted.replace("_", " ");
+  const saw = observed ? observed.replace("_", " ") : "no valid result";
+  if (kind === "supports") return `predicted ${said}, observed ${saw}`;
+  if (kind === "refutes") return `predicted ${said}, observed ${saw}`;
+  if (kind === "weak") return `predicted ${said}, observed less than 1% change`;
+  return "the run was rejected, so it says nothing about the idea";
+}
+
+function tally(ev: EvidenceEdge[]): string {
+  const n = (k: EvidenceKind) => ev.filter((e) => e.kind === k).length;
+  const parts = [`${n("supports")} for`, `${n("refutes")} against`];
+  if (n("weak")) parts.push(`${n("weak")} weak`);
+  if (n("invalid")) parts.push(`${n("invalid")} rejected`);
+  return `based on ${parts.join(", ")}`;
+}
+
+/** When the agent's own verdict and the evidence-based confidence point different ways. */
+function verdictConflict(h: HypothesisNode): string | null {
+  if (h.status === "confirmed" && h.confidence < 0.5) return "the agent says confirmed, but the observations don't support it";
+  if (h.status === "refuted" && h.confidence > 0.6) return "the agent dropped it, but the observations mostly supported it";
+  return null;
+}
 
 export function Ledger({
   graph,
@@ -71,76 +105,115 @@ export function Ledger({
 
               {open && (
                 <div className="space-y-3 px-4 pb-4 text-[13px] leading-[19px]">
-                  <div>
-                    <Label className="mb-1 text-[11px]">Reason</Label>
-                    <p className="text-ink">{h.reason}</p>
-                  </div>
-                  <div className="font-mono text-[11px] text-muted">
-                    {h.codeRegion.file} · {h.codeRegion.symbol}
-                  </div>
+                  {/* Before: what the agent believed and predicted */}
+                  <Prov kind="agent" label="Agent predicted · before">
+                    <p className="text-ink">
+                      {graph.task.metric.label} will {h.prediction.direction === "no_change" ? "not change" : h.prediction.direction} {arrowFor(h.prediction.direction)} · {pct(h.prediction.confidence)} sure
+                    </p>
+                    <p className="mt-1 text-muted">Because: {h.reason}</p>
+                    <p className="mt-1 font-mono text-[11px] text-subtle">
+                      will change {h.codeRegion.file} · {h.codeRegion.symbol}
+                    </p>
+                  </Prov>
+
                   {h.tests.map((eid) => {
                     const e = exps.get(eid);
                     if (!e) return null;
                     const ev = evidence.find((x) => x.experiment === eid);
+                    const delta = confidenceDelta(h, e.seq);
+                    const ck = checks[eid];
                     return (
-                      <div key={eid} className="rounded-[6px] border border-line bg-white p-3">
-                        <div className="flex items-center justify-between font-mono text-[12px]">
-                          <span className="flex items-center gap-2">
-                            <span className="text-ink">{eid}</span>
-                            {ev && <Chip className={EVIDENCE_STYLE[ev.kind].cls}>{EVIDENCE_STYLE[ev.kind].title.split(" ")[0]}</Chip>}
-                            {e.measuredBy === "client" && (
-                              <Chip className="border-line text-warning" title="Metric reported by the client, not measured by a Glassbox verifier">
-                                client-reported
-                              </Chip>
-                            )}
-                          </span>
-                          <span className="tabular-nums text-muted">
-                            {e.correct ? `${fmtRows(e.metricBefore)} → ${fmtRows(e.metricAfter)}` : e.errorKind}
-                          </span>
-                        </div>
-                        {e.errorMessage && <p className="mt-1 font-mono text-[11px] text-danger">{e.errorMessage.slice(0, 220)}</p>}
-                        {e.note && <p className="mt-2 text-ink">“{e.note}”</p>}
-                        {checks[eid] && (
-                          <div className="mt-2 border-t border-line pt-2 font-mono text-[11px] leading-[16px]">
-                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-muted">
-                              <span className="uppercase tracking-[0.08em]">Signals</span>
-                              <span title="P(diff implements the hypothesis)">on-topic {pct(checks[eid].on_topic)}</span>
-                              <span>·</span>
-                              <span title="P(gain comes from places the hypothesis doesn't predict)">unexplained {pct(checks[eid].unexplained)}</span>
-                              <span>·</span>
-                              <span title="P(the change alters what is computed)">semantics {pct(checks[eid].semantics)}</span>
-                            </div>
-                            {checks[eid].flags.length > 0 ? (
-                              <div className="mt-1 flex flex-wrap gap-1">
-                                {checks[eid].flags.map((f) => (
-                                  <Chip key={f} className="border-transparent bg-warn-fill text-ink">
-                                    ⚑ {FLAG_TEXT[f]}
-                                  </Chip>
-                                ))}
+                      <div key={eid} className="space-y-2 rounded-[6px] border border-line bg-white p-3">
+                        <div className="font-mono text-[12px] text-ink">{eid}</div>
+
+                        <Prov kind="observed" label={e.measuredBy === "client" ? "Observed · reported by client" : "Observed · harness"}>
+                          <p className="font-mono text-[12px] tabular-nums text-ink">
+                            {e.correct
+                              ? `${graph.task.metric.label} ${fmtRows(e.metricBefore)} → ${fmtRows(e.metricAfter)}${e.rawChange !== null ? ` (${signedPct(e.rawChange)})` : ""}`
+                              : `${e.errorKind}: run rejected`}
+                          </p>
+                          <p className="font-mono text-[11px] text-muted">
+                            {e.correct ? "results correct ✓" : "results not accepted"} · {e.beatsBest ? "new best" : e.correct ? "not better than best" : "no score"}
+                            {e.filesChanged.length ? ` · changed ${e.filesChanged.join(", ")}` : ""}
+                          </p>
+                          {e.errorMessage && <p className="mt-1 font-mono text-[11px] text-danger">{e.errorMessage.slice(0, 220)}</p>}
+                        </Prov>
+
+                        {(e.note || e.agentKept !== null) && (
+                          <Prov kind="agent" label="Agent concluded · after">
+                            {e.note && <p className="text-ink">“{e.note}”</p>}
+                            {e.agentKept !== null && <p className="font-mono text-[11px] text-muted">decided to {e.agentKept ? "keep" : "revert"} the change</p>}
+                          </Prov>
+                        )}
+
+                        <Prov kind="glassbox" label="Glassbox infers">
+                          {ev ? (
+                            <p className="text-ink">
+                              <Chip className={EVIDENCE_STYLE[ev.kind].cls}>{EVIDENCE_STYLE[ev.kind].title.split(" ")[0]}</Chip>{" "}
+                              <span className="text-muted">{evidenceWhy(ev.kind, h.prediction.direction, e.observed)}</span>
+                              {delta !== null && (
+                                <span className={`block font-mono text-[11px] ${delta >= 0 ? "text-success" : "text-danger"}`}>
+                                  → confidence {delta >= 0 ? "+" : "−"}
+                                  {Math.abs(Math.round(delta * 100))} pts
+                                </span>
+                              )}
+                            </p>
+                          ) : (
+                            <p className="text-muted">no evidence recorded</p>
+                          )}
+                          {e.disagreement && (
+                            <p className="font-mono text-[11px] text-warning">
+                              ⚠ the agent decided to {e.agentKept ? "keep" : "revert"}, but the harness says this {e.beatsBest ? "was" : "was not"} a new best
+                            </p>
+                          )}
+                          {ck && (
+                            <div className="mt-1 font-mono text-[11px] leading-[16px]">
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-muted">
+                                <span title="Model check (SubQ Snap) of the diff against the stated hypothesis">check:</span>
+                                <span title="P(diff implements the hypothesis)">on-topic {pct(ck.on_topic)}</span>
+                                <span>·</span>
+                                <span title="P(gain comes from places the hypothesis doesn't predict)">unexplained {pct(ck.unexplained)}</span>
+                                <span>·</span>
+                                <span title="P(the change alters what is computed)">semantics {pct(ck.semantics)}</span>
                               </div>
-                            ) : (
-                              <p className="mt-1 text-success">✓ tests what it claimed · {checks[eid].fit.label.toLowerCase()}</p>
-                            )}
-                          </div>
-                        )}
-                        {e.disagreement && (
-                          <p className="mt-1 font-mono text-[11px] text-warning">Agent kept={String(e.agentKept)}; harness beats_best={String(e.beatsBest)}</p>
-                        )}
+                              {ck.flags.length > 0 ? (
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                  {ck.flags.map((f) => (
+                                    <Chip key={f} className="border-transparent bg-warn-fill text-ink">
+                                      ⚑ {FLAG_TEXT[f]}
+                                    </Chip>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="mt-1 text-success">✓ the diff tests what it claimed · {ck.fit.label.toLowerCase()}</p>
+                              )}
+                            </div>
+                          )}
+                        </Prov>
                       </div>
                     );
                   })}
+
                   {h.summary && (
-                    <div>
-                      <Label className="mb-1 text-[11px]">Closing summary</Label>
-                      <p className="text-ink">{h.summary}</p>
-                    </div>
+                    <Prov kind="agent" label={`Agent's verdict · ${h.status}`}>
+                      <p className="text-ink">“{h.summary}”</p>
+                    </Prov>
                   )}
+
+                  <Prov kind="glassbox" label="Glassbox infers · overall">
+                    <p className="text-ink">
+                      confidence <span className="font-mono tabular-nums">{pct(h.prediction.confidence)}</span> stated →{" "}
+                      <span className="font-mono tabular-nums">{pct(h.confidence)}</span> after {h.tests.length} observation{h.tests.length === 1 ? "" : "s"}
+                    </p>
+                    <p className="font-mono text-[11px] text-muted">{tally(evidence)}</p>
+                    {verdictConflict(h) && <p className="mt-1 font-mono text-[11px] text-warning">⚠ {verdictConflict(h)}</p>}
+                  </Prov>
                   {(() => {
                     const last = [...h.tests].reverse().map((id) => exps.get(id)).find((e) => e?.diff);
                     if (!last) return null;
                     return (
                       <div>
-                        <Label className="mb-1 text-[11px]">Diff · {last.id}</Label>
+                        <Mark kind="observed" label={`Observed · diff ${last.id}`} className="mb-1" />
                         <pre className="max-h-56 overflow-auto rounded-[6px] bg-scope p-3 font-mono text-[11px] leading-[16px] text-scope-text">
                           {last.diff.split("\n").map((line, i) => (
                             <div

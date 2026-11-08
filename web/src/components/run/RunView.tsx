@@ -7,6 +7,7 @@ import { BeforeView } from "./BeforeView";
 import { BeliefGraph } from "./BeliefGraph";
 import { HeatmapView } from "./HeatmapView";
 import { Ledger } from "./Ledger";
+import { ProvKey } from "./provenance";
 import { QueryBox } from "./QueryBox";
 import { Timeline } from "./Timeline";
 import { CountUp, Label, PulseDot, fmtNum } from "./ui";
@@ -155,6 +156,7 @@ export function RunView({ runId }: { runId: string }) {
             <span className="ml-auto font-mono text-[12px] text-warning">Viewing the past · seq {cursor}</span>
           )}
         </div>
+        <ProvKey className="mt-3" />
 
         <div className="mt-4 grid gap-4 pb-10 lg:grid-cols-[minmax(0,1fr)_380px]">
           <div className="min-w-0 rounded-[6px] border border-line bg-white p-4 md:p-5">
@@ -184,7 +186,7 @@ export function RunView({ runId }: { runId: string }) {
           <Timeline full={full} cursor={cursor} live={following} running={running} selected={selected} onScrub={setScrub} />
           {lastMessage && (
             <div className="flex gap-3 border-t border-scope-line pt-4 font-mono text-[13px] leading-[20px]">
-              <span className="shrink-0 text-violet">agent ›</span>
+              <span className="shrink-0 text-violet" title="The agent's own words">◇ agent ›</span>
               <span className="line-clamp-2 text-scope-text">{lastMessage.text}</span>
             </div>
           )}

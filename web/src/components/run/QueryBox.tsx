@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import type { Answer } from "@/lib/answer";
+import { Mark } from "./provenance";
 import { Chip, Label } from "./ui";
 
 type Result = { answer: Answer; confidence: number | null; seq: number; model: string; usage: { input_tokens: number } };
@@ -108,7 +109,10 @@ export function QueryBox({
 
       {res && (
         <div className="border-t border-line px-4 py-4">
-          <p className="anim-row-in text-[16px] leading-[24px] text-ink">{res.answer.lead}</p>
+          <div className="anim-row-in flex items-start gap-2">
+            <Mark kind="glassbox" label="Summary" className="mt-[6px]" />
+            <p className="text-[16px] leading-[24px] text-ink">{res.answer.lead}</p>
+          </div>
           <div className="mt-3 space-y-2">
             {res.answer.items.map((item, i) => (
               <div key={item.id} className="anim-row-in flex gap-3 rounded-[6px] border border-line p-3" style={{ animationDelay: `${(i + 1) * 60}ms` }}>
@@ -117,18 +121,19 @@ export function QueryBox({
                     {item.id} ↗
                   </Chip>
                 </button>
-                <div className="min-w-0 space-y-1 text-[13px] leading-[19px]">
+                <div className="min-w-0 space-y-1.5 text-[13px] leading-[19px]">
                   {item.lines.map((line, j) => (
-                    <p key={j} className={j === 0 ? "text-ink" : "text-muted"}>
-                      {line}
-                    </p>
+                    <div key={j} className="flex gap-2">
+                      <Mark kind={line.kind} className="mt-[3px] w-[78px]" />
+                      <p className={line.kind === "observed" ? "font-mono text-[12px] text-ink" : line.kind === "glassbox" ? "text-signal" : "text-ink"}>{line.text}</p>
+                    </div>
                   ))}
                 </div>
               </div>
             ))}
           </div>
           <div className="mt-3 font-mono text-[11px] text-muted">
-            Evidence selected by {res.model} · intent {res.answer.intent.replace("_", " ")}
+            ● observed = measured by the harness · ◇ agent = its own words · ◆ glassbox = inferred. Evidence selected by {res.model} · intent {res.answer.intent.replace("_", " ")}
             {res.confidence !== null ? ` (${Math.round(res.confidence * 100)}%)` : ""} · {res.usage.input_tokens.toLocaleString("en-US")} tokens · grounded in{" "}
             {res.answer.cited.length} nodes at seq {res.seq} · text = the agent&apos;s own records + harness numbers
           </div>

@@ -150,8 +150,8 @@ export function Timeline({
               </title>
             </circle>
           ))}
-          <text x={PAD_L - 8} y={TOP + CH + 18} textAnchor="end" fontSize={10} className="font-mono" fill="var(--color-scope-muted)">
-            EXP
+          <text x={PAD_L - 8} y={TOP + CH + 18} textAnchor="end" fontSize={10} className="font-mono" fill="var(--color-mint)">
+            ● EXP
           </text>
           {/* activity strip */}
           {full.actions.map((a) => (
@@ -165,8 +165,11 @@ export function Timeline({
               <title>Gate blocked: {g.kind}</title>
             </rect>
           ))}
-          <text x={PAD_L - 8} y={TOP + CH + 39} textAnchor="end" fontSize={10} className="font-mono" fill="var(--color-scope-muted)">
-            ACT
+          <text x={PAD_L - 8} y={TOP + CH + 39} textAnchor="end" fontSize={10} className="font-mono" fill="var(--color-mint)">
+            ● ACT
+          </text>
+          <text x={PAD_L} y={TOP - 2} fontSize={10} className="font-mono" fill="var(--color-ice)">
+            ◆ Glassbox confidence per hypothesis (inferred from observed results)
           </text>
           {/* cursor */}
           <line x1={cx} x2={cx} y1={TOP - 4} y2={TOP + CH + 44} stroke={live && running ? "var(--color-live)" : "var(--color-scope-text)"} strokeWidth={1} />
@@ -187,11 +190,12 @@ export function Timeline({
       </div>
 
       <div className="flex flex-wrap gap-x-5 gap-y-1 font-mono text-[11px] text-scope-muted">
+        <span className="uppercase tracking-[0.08em]">◆ confidence:</span>
         <Legend color="var(--color-ice)" label="open" />
         <Legend color="var(--color-mint)" label="confirmed / kept" />
         <Legend color="var(--color-danger-fill)" label="refuted / invalid" />
 <Legend color="var(--color-cyan)" label={`best ${full.task.metric.label} (up = better)`} />
-        <Legend color="var(--color-violet)" label="agent message" />
+        <Legend color="var(--color-violet)" label="◇ agent message" />
         <Legend color="var(--color-warn-fill)" label="gate blocked" />
       </div>
     </div>
