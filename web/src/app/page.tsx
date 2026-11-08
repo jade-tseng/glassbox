@@ -27,16 +27,15 @@ export default function Home() {
     <ReplayProvider startAtEnd>
       <div className="flex min-h-full flex-col">
         {/* Nav */}
-        <header className="sticky top-0 z-20 border-b border-scope-line bg-scope text-scope-text">
-          <nav className="mx-auto flex h-14 max-w-[1200px] items-center justify-between px-4 md:px-10">
-            <div className="flex min-w-0 items-center gap-3">
+        <header className="sticky top-0 z-20 bg-scope text-scope-text">
+          <nav className="mx-auto flex h-14 max-w-[1200px] items-center justify-between gap-4 px-4 md:px-10">
+            <div className="flex min-w-0 items-center gap-3 md:gap-4">
               <Link href="/" className="flex shrink-0 items-center gap-2 text-[18px] font-medium tracking-[-0.02em]">
                 <GlassCube size={18} stroke="var(--color-scope-text)" />
                 glassbox
               </Link>
-              <span className="hidden h-4 w-px bg-scope-line md:block" aria-hidden />
-              <span className="hidden truncate text-[14px] tracking-[-0.005em] text-scope-muted md:block">
-                mapping agents&apos; belief system under uncertainty
+              <span className="max-w-[170px] font-mono text-[10px] uppercase leading-[13px] tracking-[0.12em] text-scope-muted md:max-w-none md:pt-px md:text-[11px] md:leading-none md:tracking-[0.16em]">
+                mapping agents&apos; beliefs under uncertainty
               </span>
             </div>
             <Link href="/run" className="font-mono text-[12px] uppercase tracking-[0.08em] text-scope-muted transition-colors duration-150 hover:text-scope-text">
@@ -48,8 +47,7 @@ export default function Home() {
         {/* 01 — the one visual: Before → Beliefs */}
         <section id="beliefs" className="bg-scope px-4 pt-6 pb-14 text-scope-text md:px-10 md:pt-10 md:pb-20">
           <div className="mx-auto max-w-[1200px]">
-            <h1 className="sr-only">Glassbox: mapping agents&apos; belief system under uncertainty</h1>
-            <p className="mb-4 text-[14px] text-scope-muted md:hidden">mapping agents&apos; belief system under uncertainty</p>
+            <h1 className="sr-only">Glassbox: mapping agents&apos; beliefs under uncertainty</h1>
             <div className="mb-8">
               <MainHypothesis text="A web-analytics dashboard's 10 queries can return exactly the same results while scanning a small fraction of the 20,000,000 rows they scan today. Claude Code may only change the table definition and rewrite the queries; a fixed harness counts rows scanned and rejects any changed result. Over 25 experiments it got to −96%." />
             </div>
