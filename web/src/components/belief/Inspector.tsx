@@ -3,7 +3,7 @@
 // Ledger detail for one hypothesis — UI.md §7 Ledger. Agent words are sans; harness numbers are mono.
 
 import { fmtRows } from "@/lib/belief/engine";
-import { isTension } from "./BeliefGraph";
+import { isTension } from "@/lib/belief/engine";
 import { STATUS, topicColor } from "./layout";
 import { useReplay } from "./Replay";
 

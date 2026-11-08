@@ -1,0 +1,309 @@
+"use client";
+
+// Belief flow — the run as a connected graph over time (UI.md §7).
+//   x = time in the run, y = belief (0 = refuted, 1 = certain).
+//   Each hypothesis is a short segment: it starts at the agent's stated prediction (hollow dot), steps when its
+//   experiment lands, and ends with ✓ at its final belief, or falls to 0 when refuted.
+//   Arcs connect a hypothesis to the earlier one it refines / depends on / contradicts, so lineages read left → right.
+// `mode="before"` collapses it into the plain keep/discard chart; experiment dots fly between the two.
+
+import { useMemo, type CSSProperties } from "react";
+import { beliefAt, bestSoFar, fmtRows, isTension, type Experiment, type Hypothesis, type LinkRelation } from "@/lib/belief/engine";
+import { usePrefersReducedMotion } from "@/components/motion/useInView";
+import { useReplay } from "./Replay";
+import { STATUS, TOPIC_TEXT } from "./layout";
+
+const W = 1100;
+const H = 400;
+const PAD = { l: 64, r: 24, t: 26, b: 34 };
+const EASE = "cubic-bezier(.2,.8,.2,1)";
+const EASE_IO = "cubic-bezier(.65,0,.35,1)";
+const MIN_SEG_S = 6; // a hypothesis proposed and closed in the same second still gets a visible segment
+
+const LINK_STYLE: Record<LinkRelation, { stroke: string; dash?: string; label: string }> = {
+  refines: { stroke: "rgba(230,234,236,.38)", label: "refines" },
+  depends_on: { stroke: "#7FD6E4", dash: "1 3", label: "depends on" },
+  contradicts: { stroke: STATUS.refutes, dash: "4 3", label: "contradicts" },
+};
+
+export function topicStroke(topics: string[], topic: string) {
+  const i = Math.max(0, topics.indexOf(topic));
+  return TOPIC_TEXT[i % TOPIC_TEXT.length];
+}
+
+/** The chain behind a hypothesis: everything it builds on (recursively), plus the ideas that build directly on it. */
+function lineageOf(links: { from: string; to: string }[], id: string) {
+  const seen = new Set([id]);
+  const stack = [id];
+  while (stack.length) {
+    const cur = stack.pop()!;
+    for (const l of links) {
+      if (l.from === cur && !seen.has(l.to)) {
+        seen.add(l.to);
+        stack.push(l.to);
+      }
+    }
+  }
+  for (const l of links) if (l.to === id) seen.add(l.from);
+  return seen;
+}
+
+export function BeliefFlow({
+  mode,
+  focus,
+  onFocus,
+  topicFocus,
+}: {
+  mode: "beliefs" | "before";
+  focus: string | null;
+  onFocus: (id: string | null) => void;
+  topicFocus: string | null;
+}) {
+  const { state, final } = useReplay();
+  const reduced = usePrefersReducedMotion();
+  const before = mode === "before";
+  const T = Math.max(final.t, 1);
+
+  const sx = (t: number) => PAD.l + (t / T) * (W - PAD.l - PAD.r);
+  const sy = (b: number) => PAD.t + (1 - b) * (H - PAD.t - PAD.b);
+
+  // Before-view scales: x = experiment index, y = log(rows scanned).
+  const N = final.expOrder.length;
+  const lo = Math.log10(final.best * 0.8);
+  const hi = Math.log10(final.baseline * 1.05);
+  const bx = (i: number) => PAD.l + (i / Math.max(1, N - 1)) * (W - PAD.l - PAD.r);
+  const by = (v: number) => H - PAD.b - ((Math.log10(v) - lo) / (hi - lo)) * (H - PAD.t - PAD.b);
+
+  const hyps = state.order.map((id) => state.hypotheses[id]);
+  const bests = bestSoFar(state);
+  const stepPath = bests.length ? `M${bx(0)},${by(final.baseline)} ` + bests.map((b, i) => `H${bx(i)} V${by(b)}`).join(" ") : "";
+
+  // Segment geometry per hypothesis.
+  const seg = useMemo(() => {
+    const out: Record<
+      string,
+      { t0: number; t1: number; d: string; ext: string | null; end: { x: number; y: number }; dead: boolean; open: boolean }
+    > = {};
+    for (const h of hyps) {
+      const pts = h.history;
+      const dead = h.status === "refuted" || h.status === "abandoned";
+      const open = h.status === "open";
+      const t0 = pts[0]?.t ?? h.t;
+      const lastT = pts[pts.length - 1]?.t ?? t0;
+      const tEnd = Math.max(lastT, t0 + MIN_SEG_S); // where the evidence stops
+      const t1 = open ? Math.max(tEnd, state.t) : tEnd;
+      let d = `M${sx(t0)},${sy(pts[0]?.belief ?? h.prior)}`;
+      for (let i = 1; i < pts.length; i++) d += ` H${sx(Math.max(pts[i].t, t0 + (i * MIN_SEG_S) / pts.length))} V${sy(pts[i].belief)}`;
+      d += ` H${sx(tEnd)}`;
+      // Still open: the stretch after its last evidence is drawn faint, so open ideas don't dominate the chart.
+      const ext = open && t1 > tEnd ? `M${sx(tEnd)},${sy(h.belief)} H${sx(t1)}` : null;
+      out[h.id] = { t0, t1, d, ext, end: { x: sx(t1), y: sy(h.belief) }, dead, open };
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
+
+  const lineage = useMemo(() => (focus ? lineageOf(state.links, focus) : null), [focus, state.links]);
+  const lit = (h: Hypothesis) => {
+    if (lineage) return lineage.has(h.id);
+    if (topicFocus) return h.topic === topicFocus;
+    return true;
+  };
+
+  // Links: from the parent's point at the child's start (or the parent's end, if it already closed) to the child's start.
+  const links = state.links
+    .filter((l) => seg[l.from] && seg[l.to])
+    .map((l) => {
+      const child = state.hypotheses[l.from];
+      const parent = state.hypotheses[l.to];
+      const cs = seg[child.id];
+      const ps = seg[parent.id];
+      const pt = Math.min(cs.t0, ps.t1);
+      const x1 = sx(pt);
+      const y1 = sy(beliefAt(parent, pt));
+      const x2 = sx(cs.t0);
+      const y2 = sy(child.prior);
+      const mx = (x1 + x2) / 2;
+      const d = `M${x1},${y1} C${mx + 18},${y1} ${mx - 18},${y2} ${x2},${y2}`;
+      return { key: `${l.from}-${l.to}-${l.relation}`, d, rel: l.relation, child, parent, mid: { x: mx, y: (y1 + y2) / 2 } };
+    });
+
+  const dotPos = (e: Experiment, i: number) => {
+    if (before) return { x: bx(i), y: by(e.after ?? e.before) };
+    const h = state.hypotheses[e.hypothesisIds[0]];
+    const t = Math.max(e.t, seg[h?.id ?? ""]?.t0 ?? e.t);
+    return { x: sx(t), y: sy(h ? beliefAt(h, e.t + 0.01) : 0.5) };
+  };
+
+  const fade = (on: boolean, delay = 0): CSSProperties => ({
+    opacity: on ? 1 : 0,
+    transition: `opacity 280ms ${EASE} ${on ? delay : 0}ms`,
+    pointerEvents: on ? "auto" : "none",
+  });
+
+  const minutes = Array.from({ length: Math.floor(T / 60) + 1 }, (_, m) => m * 60).filter((t) => t > 0);
+
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className="block w-full min-w-[760px]"
+      role="img"
+      aria-label={before ? "Keep/discard chart of rows scanned per experiment" : "Belief in each hypothesis over time, with links between related hypotheses"}
+      onMouseLeave={() => onFocus(null)}
+    >
+      <defs>
+        <marker id="arrow-dep" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M0,0 L6,3 L0,6 z" fill="#7FD6E4" />
+        </marker>
+      </defs>
+
+      {/* ---- Before: rows scanned per experiment ---- */}
+      <g style={fade(before)}>
+        {[final.baseline, 1e7, 3e6, 1e6].filter((v) => v >= final.best * 0.8).map((v) => (
+          <g key={v}>
+            <line x1={PAD.l} x2={W - PAD.r} y1={by(v)} y2={by(v)} stroke="rgba(230,234,236,.10)" strokeDasharray="2 4" />
+            <text x={PAD.l - 10} y={by(v) + 4} textAnchor="end" className="font-mono" fontSize={11} fill="#8A949A">
+              {fmtRows(v)}
+            </text>
+          </g>
+        ))}
+        <text x={PAD.l} y={14} className="font-mono" fontSize={11} letterSpacing="0.08em" fill="#8A949A">
+          ROWS SCANNED (LOG) · PER EXPERIMENT
+        </text>
+        <text x={W - PAD.r} y={H - 8} textAnchor="end" className="font-mono" fontSize={11} letterSpacing="0.08em" fill="#8A949A">
+          EXPERIMENTS →
+        </text>
+        <path d={stepPath} fill="none" stroke={STATUS.supports} strokeOpacity={0.55} strokeWidth={1.5} />
+      </g>
+
+      {/* ---- Beliefs: axes ---- */}
+      <g style={fade(!before, 450)}>
+        {[
+          { v: 1, l: "certain" },
+          { v: 0.5, l: "unsure" },
+          { v: 0, l: "refuted" },
+        ].map(({ v, l }) => (
+          <g key={v}>
+            <line x1={PAD.l} x2={W - PAD.r} y1={sy(v)} y2={sy(v)} stroke="rgba(230,234,236,.10)" strokeDasharray={v === 0 ? undefined : "2 4"} />
+            <text x={PAD.l - 10} y={sy(v) + 4} textAnchor="end" className="font-mono" fontSize={11} fill="#8A949A">
+              {l}
+            </text>
+          </g>
+        ))}
+        {minutes.map((t) => (
+          <text key={t} x={sx(t)} y={H - 10} textAnchor="middle" className="font-mono" fontSize={10} fill="#8A949A">
+            {t / 60}m
+          </text>
+        ))}
+        {/* now line */}
+        <line x1={sx(state.t)} x2={sx(state.t)} y1={PAD.t - 8} y2={H - PAD.b} stroke="rgba(184,242,58,.35)" />
+
+        {/* Links between hypotheses */}
+        {links.map((l) => {
+          const st = LINK_STYLE[l.rel];
+          const on = lit(l.child) && lit(l.parent);
+          const show = focus === l.child.id || focus === l.parent.id || l.rel === "contradicts";
+          return (
+            <g key={l.key} style={{ opacity: on ? 1 : 0.12, transition: `opacity 280ms ${EASE}` }}>
+              <path
+                d={l.d}
+                fill="none"
+                stroke={st.stroke}
+                strokeWidth={l.rel === "refines" ? 1 : 1.3}
+                strokeDasharray={st.dash}
+                markerEnd={l.rel === "depends_on" ? "url(#arrow-dep)" : undefined}
+              />
+              {show && (
+                <text x={l.mid.x + 6} y={l.mid.y - 4} className="font-mono" fontSize={10} fill={st.stroke === LINK_STYLE.refines.stroke ? "#C9CFD3" : st.stroke}>
+                  {l.child.id} {st.label} {l.parent.id}
+                </text>
+              )}
+            </g>
+          );
+        })}
+
+        {/* Hypothesis segments */}
+        {hyps.map((h) => {
+          const s = seg[h.id];
+          const color = topicStroke(final.topics, h.topic);
+          const on = lit(h);
+          const isNew = state.newest === h.id || h.experiments.includes(state.newest ?? "");
+          const tension = isTension(h, state.experiments);
+          return (
+            <g
+              key={h.id}
+              role="button"
+              tabIndex={0}
+              aria-label={`${h.id} ${h.status}: ${h.claim}`}
+              onMouseEnter={() => onFocus(h.id)}
+              onFocus={() => onFocus(h.id)}
+              onClick={() => onFocus(h.id)}
+              className="cursor-pointer outline-none"
+              style={{ opacity: on ? (s.dead ? 0.7 : 1) : 0.12, transition: `opacity 280ms ${EASE}` }}
+            >
+              <path d={s.d} fill="none" stroke="transparent" strokeWidth={14} />
+              {s.ext && <path d={s.ext} fill="none" stroke={color} strokeOpacity={0.35} strokeWidth={1} strokeDasharray="2 4" />}
+              <path
+                d={s.d}
+                fill="none"
+                stroke={s.dead ? STATUS.refutes : color}
+                strokeWidth={focus === h.id ? 3 : 2}
+                strokeLinecap="round"
+                pathLength={1}
+                className={reduced ? undefined : "anim-draw"}
+              />
+              {/* prediction: hollow dot at the stated prior */}
+              <circle cx={sx(s.t0)} cy={sy(h.history[0]?.belief ?? h.prior)} r={4} fill="#0E1114" stroke={color} strokeWidth={1.5} />
+              <text x={sx(s.t0)} y={sy(h.history[0]?.belief ?? h.prior) - 9} textAnchor="middle" className="font-mono" fontSize={10} fill={focus === h.id ? "#E6EAEC" : "#8A949A"}>
+                {h.id}
+              </text>
+              {/* outcome */}
+              {s.dead ? (
+                <g transform={`translate(${s.end.x},${s.end.y})`}>
+                  <circle r={5} fill={STATUS.refutes} />
+                  <path d="M-2.2,-2.2 L2.2,2.2 M2.2,-2.2 L-2.2,2.2" stroke="#0E1114" strokeWidth={1.4} />
+                </g>
+              ) : h.status === "confirmed" ? (
+                <g transform={`translate(${s.end.x},${s.end.y})`}>
+                  <circle r={5} fill={tension ? STATUS.amber : STATUS.supports} />
+                  <path d="M-2.4,0.2 L-0.6,2 L2.6,-1.8" fill="none" stroke="#0E1114" strokeWidth={1.4} />
+                </g>
+              ) : (
+                <circle cx={s.end.x} cy={s.end.y} r={3} fill={color} />
+              )}
+              {isNew && !reduced && <circle key={`ring-${state.seq}`} cx={s.end.x} cy={s.end.y} r={5} fill="none" stroke={STATUS.live} className="anim-ring" />}
+            </g>
+          );
+        })}
+      </g>
+
+      {/* ---- Experiment dots: shared by both views, they fly between them ---- */}
+      {final.expOrder.map((id, i) => {
+        const e = state.experiments[id];
+        if (!e) return null;
+        const p = dotPos(e, i);
+        const h = state.hypotheses[e.hypothesisIds[0]];
+        const dim = !before && h ? !lit(h) : false;
+        const bad = e.failed || !e.correct;
+        const fill = bad ? STATUS.refutes : e.kept === true ? STATUS.supports : e.kept === false ? "#0E1114" : "#E6EAEC";
+        const stroke = bad ? STATUS.refutes : e.kept === false ? "#7C8B98" : fill;
+        const r = before ? 5 : 2.5;
+        return (
+          <g
+            key={id}
+            style={{
+              transform: `translate(${p.x}px, ${p.y}px)`,
+              transition: reduced ? "none" : `transform 600ms ${EASE_IO} ${i * 25}ms, opacity 280ms ${EASE}`,
+              opacity: dim ? 0.15 : 1,
+            }}
+          >
+            <title>
+              {`${e.id} · ${e.failed ? `failed (${e.errorKind})` : `rows scanned ${fmtRows(e.before)} → ${fmtRows(e.after ?? e.before)}`}${e.kept === null ? "" : e.kept ? " · kept" : " · discarded"}`}
+            </title>
+            <circle r={r} fill={fill} stroke={stroke} strokeWidth={1.2} style={{ transition: `r 600ms ${EASE_IO}` }} />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}

@@ -41,9 +41,15 @@ export default function Home() {
         {/* 01 — the one visual: Before → Beliefs */}
         <section id="beliefs" className="bg-scope px-4 pt-8 pb-14 text-scope-text md:px-10 md:pt-12 md:pb-20">
           <div className="mx-auto max-w-[1200px]">
-            <h1 className="mb-6 text-[24px] font-medium leading-[1.15] tracking-[-0.025em] md:text-[28px]">
-              Inside an autoresearch run.
-            </h1>
+            <h1 className="text-[32px] font-medium leading-[1.05] tracking-[-0.03em] md:text-[44px]">Agent Archaeology.</h1>
+            <p className="mt-2 text-[16px] text-scope-muted md:text-[18px]">From uncertainty to a mapped agent belief system</p>
+            <p className="mt-6 mb-8 max-w-[70ch] text-[15px] leading-6 text-scope-text/85">
+              <span className="font-mono text-[12px] uppercase tracking-[0.08em] text-scope-muted">Main hypothesis · </span>
+              A web-analytics dashboard&apos;s 10 queries can return exactly the same results while scanning a small
+              fraction of the 20,000,000 rows they scan today. Claude Code may only change the table definition and
+              rewrite the queries; a fixed harness counts rows scanned and rejects any changed result. Over 25
+              experiments it got to −96%.
+            </p>
             <BeliefSection />
           </div>
         </section>

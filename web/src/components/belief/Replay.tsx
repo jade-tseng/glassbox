@@ -1,15 +1,15 @@
 "use client";
 
-// Replays a recorded run (runs/bg2, labeled REPLAY) through the belief engine.
+// Replays a recorded run (runs/bg3, labeled REPLAY) through the belief engine.
 // Every belief view on the page reads the same seq, so scrubbing moves them all together.
 // Later: swap the static events for the /api/events poll and keep the same context.
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import bg2 from "@/lib/belief/bg2.json";
+import bg3 from "@/lib/belief/bg3.json";
 import { buildGraph, type GraphState, type RunEvent } from "@/lib/belief/engine";
 import { usePrefersReducedMotion } from "@/components/motion/useInView";
 
-const EVENTS = bg2 as unknown as RunEvent[];
+const EVENTS = bg3 as unknown as RunEvent[];
 const FAST = new Set(["agent_action", "run_started"]);
 const STEP_MS = 650;
 const FAST_MS = 110;
@@ -64,7 +64,7 @@ export function ReplayProvider({ children, startAtEnd = false }: { children: Rea
     atHead: playing,
     state,
     final,
-    runId: "bg2",
+    runId: "bg3",
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

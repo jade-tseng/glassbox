@@ -191,3 +191,13 @@ h1, h2, h3, h4 {
   .reveal { transform: none; filter: none; transition: opacity 150ms linear; }
   .bar-grow { transition: none; }
 }
+
+/* Belief flow: a segment draws itself in once, left to right */
+@keyframes draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+.anim-draw { stroke-dasharray: 1; stroke-dashoffset: 0; animation: draw 600ms var(--ease-out) both; }
+@media (prefers-reduced-motion: reduce) {
+  .anim-draw { animation: none; stroke-dasharray: none; }
+}

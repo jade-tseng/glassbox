@@ -214,3 +214,20 @@ export function bestSoFar(s: GraphState): number[] {
   }
   return out;
 }
+
+/** "Claimed, not shown": the agent closed it as confirmed, but the measurements don't back it. */
+export function isTension(h: Hypothesis, exps: Record<string, Experiment>) {
+  if (h.status !== "confirmed") return false;
+  const supported = h.experiments.some((e) => exps[e]?.evidence === "supports");
+  return h.belief < 0.5 || !supported;
+}
+
+/** Belief of a hypothesis at time t (last recorded point at or before t). */
+export function beliefAt(h: Hypothesis, t: number) {
+  let b = h.history[0]?.belief ?? h.prior;
+  for (const p of h.history) {
+    if (p.t <= t) b = p.belief;
+    else break;
+  }
+  return b;
+}

@@ -271,18 +271,16 @@ Mono label (12px, muted) → `CountUp` value (mono 32–40px) → delta (12px mo
 - The right ledger is 320px and collapses to a bottom sheet under `lg`.
 - Tabs are mono 12px uppercase. The active tab has a 1px ink underline, which slides between tabs (`--dur-base`).
 
-### Belief graph (signature component)
-The centerpiece. The landing page uses a hand-laid SVG version (`components/belief/BeliefGraph.tsx`): stable lanes computed from the full run, the biggest topic as a grid in the middle. The app view may use `@xyflow/react` + ELK with custom nodes only. Both read the shared engine (`lib/beliefEngine.ts`).
-- **Topic hull:** a rounded 12px region with a 1px line in the topic color at 40% opacity, a 4% topic-color fill, and a mono uppercase topic label at top-left with counts (`PROJECTIONS · 7 · 2 refuted`). Collapsed by default when it has more than 4 hypotheses (PLAN §7: clutter). It expands to a fan.
-- **Hypothesis card (220×~76):** scope-raised, 6px radius, 2px topic-color left bar.
-  - Row 1: mono id + status chip (`H6 · REFUTED`).
-  - Row 2: claim, 13px sans, 2 lines max.
-  - Row 3: the **prediction-vs-belief bar**. A 4px track with a dashed tick at the stated prior (the prediction) and a solid fill at the current posterior. The gap between tick and fill is the story: was the agent over- or under-confident? The number is mono on the right (`0.50 → 0.08`).
-- **Experiment dots (8px):** these sit in a row at the bottom-right of their hypothesis card, in seq order, so they can fly to and from the Before chart. They're filled or hollow per §2.5, and an edge to the card is colored by its evidence type. Hovering shows a tooltip with `E6 · read_rows 2.31M → 2.31M (0%) · correct · discarded`.
-- **Cross-links:** curved, labeled in mono 10px at the midpoint on a scope-colored backing so the label stays legible. Real runs have few explicit links, so also draw an **implicit `same region` link** (1px dotted, no label until hover) between hypotheses that share a `code_region.symbol` (e.g. H6 ↔ H9 on `PROJECTION p_src`). It makes "learned from a failure" visible.
-- **Focus:** clicking a card dims everything except its evidence, links and topic. The ledger scrolls to it.
-- **Tension:** an amber corner triangle marks a hypothesis the agent closed as *confirmed* while the measured evidence doesn't back it (belief < 0.5, or no supporting experiment). In `bg2` this flags H16 and H17. It's the closest thing to a reward-hacking signal we show, so keep it visible.
-- **Query citations:** cited nodes get the signal ring and a numbered chip matching `[1]` in the answer. The canvas pans and zooms to fit them (400ms, `--ease-in-out`).
+### Belief flow (signature component)
+The centerpiece: the run as a **connected graph over time** (`components/belief/BeliefFlow.tsx`). It isn't a board of boxes.
+- **Axes:** x = time in the run (minute ticks), y = belief (`refuted` 0 · `unsure` 0.5 · `certain` 1).
+- **Hypothesis = a short segment.** It starts at the agent's stated prediction (a hollow dot labeled `H#`), steps when its experiment lands, and ends with a mint ✓ at its final belief, or **falls to 0** in coral when refuted. An amber ✓ means "claimed, not shown". Segments are colored by topic. Ideas still open keep a faint dashed tail up to "now", so they don't dominate.
+- **Links connect lineages:** an arc from the parent hypothesis (its point at the child's start, or its end if it already closed) to the child's start. `refines` is a thin light line, `depends on` is a dotted cyan arrow, `contradicts` is a dashed coral line that is always labeled.
+- **Hover a hypothesis:** its lineage lights up (everything it builds on, plus the ideas built directly on it). The link labels appear ("H16 refines H12"), and the inspector shows its claim, reason, evidence and conclusion.
+- **Topic glossary** below the chart: each agent topic name with a plain-language gloss written by Glassbox ("projections: extra copies of the table, pre-sorted or pre-aggregated… more storage"). Hovering a topic dims the others.
+- **Before → Beliefs:** the same SVG. Experiment dots sit at (experiment #, rows scanned) in Before, and fly to (time, belief) on their hypothesis's segment in Beliefs. The view opens on Before and flies to Beliefs once, after about 3s.
+- **Replay bar:** play and scrub. Every view on the page reads the same position. The page opens on the finished run, paused.
+- **Data:** the landing page replays `bg3` (25 hypotheses, 23 explicit links), since lineage needs links.
 
 ### Belief timeline + scrubber
 - X axis is time or seq. Each hypothesis is a 1.5px line in its topic color, starting at its proposal at the stated prior (a hollow dot marks the prediction) and stepping at each experiment. Confirmed lines end in a mint dot. Refuted lines **fall to 0 and stop** in coral, which is the "beliefs rising and collapsing" moment. Gate blocks are amber diamonds on the baseline.
@@ -360,7 +358,7 @@ Agents can now run research loops by themselves. What they leave behind is a sco
 
 | # | Section | Job |
 |---|---|---|
-| 1 | `Inside an autoresearch run.` (top, scope) | A real run opens on **Before** (the keep/discard chart), then flies to **Beliefs** on its own after ~3s. The inspector and timeline sit below it. |
+| 1 | `Agent Archaeology.` + "From uncertainty to a mapped agent belief system" + the main hypothesis in 2–3 sentences (top, scope) | A real run opens on **Before** (the keep/discard chart), then flies to **Beliefs** on its own after ~3s. The inspector and timeline sit below it. |
 | 2 | `02 / Runs` | Every real run as a compact table linking to its run view, plus `Describe a problem →` (/new) and `All runs →` (/run). |
 | 3 | `03 / Impact` | Which ideas paid off, with one computed sentence per chart. |
 | 4 | `04 / Loop` | The orbit: predict → measure → update, with the gate at the center. |
