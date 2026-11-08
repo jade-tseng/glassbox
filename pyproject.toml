@@ -10,6 +10,7 @@ dependencies = [
   "pydantic>=2.7",
   "python-dotenv>=1.0",
   "claude-agent-sdk>=0.2.179",
+  "pytest>=9.2.0",
 ]
 
 [tool.uv]
