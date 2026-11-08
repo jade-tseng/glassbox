@@ -33,6 +33,7 @@ export type HypothesisNode = {
   history: { seq: number; t: number; confidence: number }[];
   tests: string[]; // experiment ids
   proposedSeq: number;
+  observations: { seq: number; when: "before" | "while" }[]; // evidence the agent looked at (observation seqs)
 };
 
 export type ExperimentNode = {
@@ -58,6 +59,9 @@ export type ExperimentNode = {
   breakdown: Record<string, number | null>; // optional per-component metric values
   measuredBy: "harness" | "client"; // harness = Glassbox's own verifier hook; client = reported via ingest/bridge
 };
+
+/** Output of an evidence-gathering command (e.g. a trace query), recorded verbatim by the harness. */
+export type ObservationNode = { seq: number; t: number; command: string; output: string; truncated: boolean; hypothesisIds: string[]; ledTo: string | null };
 
 export type EvidenceEdge = { experiment: string; hypothesis: string; kind: EvidenceKind; weight: number };
 export type LinkEdge = { from: string; to: string; relation: Relation; reason: string; seq: number };
@@ -107,6 +111,7 @@ export type GraphState = {
   links: LinkEdge[];
   gateBlocks: { seq: number; t: number; kind: string; detail: string }[];
   actions: { seq: number; t: number; tool: string; target: string }[];
+  observations: ObservationNode[];
   messages: { seq: number; t: number; text: string }[];
   metric: {
     baseline: number | null;
@@ -182,12 +187,14 @@ export function buildGraph(events: GbEvent[], upToSeq: number = Number.POSITIVE_
     links: [],
     gateBlocks: [],
     actions: [],
+    observations: [],
     messages: [],
     metric: { baseline: null, baselineBreakdown: {}, best: null, series: [] },
     calibration: { brier: null, n: 0 },
     finished: false,
   };
   const expById = new Map<string, ExperimentNode>();
+  let pendingObs: number[] = []; // observations made while nothing was armed: they lead to the next hypothesis
   const firstTestScored = new Set<string>();
   const brierByTopic = new Map<string, number[]>();
 
@@ -231,7 +238,13 @@ export function buildGraph(events: GbEvent[], upToSeq: number = Number.POSITIVE_
           history: [{ seq: ev.seq, t: ev.t, confidence: c }],
           tests: [],
           proposedSeq: ev.seq,
+          observations: pendingObs.map((seq) => ({ seq, when: "before" as const })),
         };
+        for (const seq of pendingObs) {
+          const o = state.observations.find((x) => x.seq === seq);
+          if (o) o.ledTo = id;
+        }
+        pendingObs = [];
         state.hypotheses[id] = h;
         let topic = state.topics.find((tp) => tp.name === h.topic);
         if (!topic) {
@@ -352,6 +365,21 @@ export function buildGraph(events: GbEvent[], upToSeq: number = Number.POSITIVE_
       case "agent_message":
         state.messages.push({ seq: ev.seq, t: ev.t, text: str(ev.text) });
         break;
+      case "observation": {
+        const ids = ((ev.hypothesis_ids as string[]) ?? []).filter((id) => state.hypotheses[id]);
+        state.observations.push({
+          seq: ev.seq,
+          t: ev.t,
+          command: str(ev.command),
+          output: str(ev.output),
+          truncated: Boolean(ev.truncated),
+          hypothesisIds: ids,
+          ledTo: null,
+        });
+        if (ids.length) for (const id of ids) state.hypotheses[id].observations.push({ seq: ev.seq, when: "while" });
+        else pendingObs.push(ev.seq);
+        break;
+      }
       case "run_finished":
         state.finished = true;
         break;

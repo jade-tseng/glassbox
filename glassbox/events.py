@@ -25,6 +25,7 @@ Source = Literal["mcp", "hook", "system"]
 EVENT_TYPES = {
     "run_started", "hypothesis_proposed", "hypothesis_linked", "experiment_run", "experiment_failed",
     "experiment_interpreted", "hypothesis_closed", "gate_blocked", "agent_action", "agent_message", "run_finished",
+    "observation",  # output of an evidence-gathering command (e.g. a trace query), recorded verbatim
 }
 
 

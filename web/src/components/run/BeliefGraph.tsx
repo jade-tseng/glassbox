@@ -236,8 +236,15 @@ function HypothesisCard({
         </p>
       )}
 
-      <div className="mt-2 truncate font-mono text-[11px] text-subtle">
-        {h.codeRegion.file} · {h.codeRegion.symbol}
+      <div className="mt-2 flex items-center justify-between gap-2 font-mono text-[11px] text-subtle">
+        <span className="truncate">
+          {h.codeRegion.file} · {h.codeRegion.symbol}
+        </span>
+        {h.observations.length > 0 && (
+          <span className="shrink-0 text-success" title="Observations the agent looked at before and while testing this idea">
+            ● {h.observations.length} looked at
+          </span>
+        )}
       </div>
     </button>
   );

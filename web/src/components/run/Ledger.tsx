@@ -116,6 +116,29 @@ export function Ledger({
                     </p>
                   </Prov>
 
+                  {(["before", "while"] as const).map((when) => {
+                    const obs = h.observations.filter((o) => o.when === when).map((o) => graph.observations.find((x) => x.seq === o.seq)).filter(Boolean);
+                    if (!obs.length) return null;
+                    return (
+                      <Prov key={when} kind="observed" label={`Observed ${when === "before" ? "before proposing" : "while testing"} · ${obs.length}`}>
+                        <p className="mb-1 text-[12px] text-muted">
+                          {when === "before" ? "What the agent looked at that led to this belief:" : "What it looked at while this idea was being tested:"}
+                        </p>
+                        <div className="space-y-1">
+                          {obs.map((o) => (
+                            <details key={o!.seq} className="rounded-[3px] border border-line bg-white">
+                              <summary className="cursor-pointer px-2 py-1 font-mono text-[11px] text-ink">{o!.command.replace(/^python3\s+/, "")}</summary>
+                              <pre className="max-h-48 overflow-auto border-t border-line bg-frost px-2 py-1.5 font-mono text-[10.5px] leading-[15px] text-ink">
+                                {o!.output || "(no output)"}
+                                {o!.truncated ? "\n…(truncated)" : ""}
+                              </pre>
+                            </details>
+                          ))}
+                        </div>
+                      </Prov>
+                    );
+                  })}
+
                   {h.tests.map((eid) => {
                     const e = exps.get(eid);
                     if (!e) return null;

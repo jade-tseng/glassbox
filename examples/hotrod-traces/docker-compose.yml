@@ -1,0 +1,19 @@
+# Source of the runtime traces: Jaeger's open-source HotROD demo (Apache-2.0) reporting to Jaeger.
+# Only used to GENERATE the trace files; the agent never sees this app or its source.
+services:
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    ports:
+      - "127.0.0.1:16686:16686"
+      - "127.0.0.1:4318:4318"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+  hotrod:
+    image: jaegertracing/example-hotrod:1.62.0
+    command: ["all"]
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+    depends_on:
+      - jaeger

@@ -3,6 +3,8 @@
 - gate:     PreToolUse Bash  — deny the evaluator unless a hypothesis is armed (gate_blocked)
 - scope:    PreToolUse Edit/Write — only the target's editable files (gate_blocked kind=scope)
 - capture:  PostToolUse Bash — read the evaluator's result file -> experiment_run / experiment_failed
+- observe:  PostToolUse Bash — output of the target's evidence tool -> observation (verbatim, linked to armed hypotheses)
+- read:     PreToolUse Read/Glob/Grep/Bash — no reading outside the workdir (held-out data lives outside it)
 - trace:    PostToolUse (non-glassbox tools) -> agent_action
 """
 
@@ -21,6 +23,8 @@ from .events import EventLog
 from .target import Target
 
 EDIT_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
+READ_TOOLS = ("Read", "Glob", "Grep")
+SHELL_READERS = ("cat", "head", "tail", "ls", "wc", "grep", "less", "more", "find")
 
 
 def unified_diff(before: dict[str, str], after: dict[str, str]) -> tuple[str, list[str]]:
@@ -77,6 +81,44 @@ def build_hooks(log: EventLog, workdir: Path, target: Target) -> dict[str, list[
             return deny(f"Blocked by Glassbox: you may only edit {', '.join(target.editable)} in this directory.")
         return {}
 
+    def outside(raw: str) -> bool:
+        if not raw:
+            return False
+        p = (workdir / raw).resolve() if not Path(raw).is_absolute() else Path(raw).resolve()
+        try:
+            p.relative_to(workdir)
+            return False
+        except ValueError:
+            return True
+
+    async def read_guard(inp: dict[str, Any], tool_use_id: str | None, ctx: Any) -> dict:
+        ti = inp.get("tool_input", {}) or {}
+        name = inp.get("tool_name", "")
+        if name in READ_TOOLS:
+            raw = ti.get("file_path") or ti.get("path") or ""
+            if outside(raw):
+                log.emit("gate_blocked", "hook", kind="read_scope", tool=name, file=str(raw)[:200])
+                return deny("Blocked by Glassbox: you may only read files inside this directory.")
+            return {}
+        cmd = ti.get("command", "")
+        if target.is_eval(cmd):
+            return {}
+        words = cmd.replace(";", " ").replace("&&", " ").replace("|", " ").split()
+        if words and words[0] in SHELL_READERS and any((w.startswith("/") or ".." in w) and outside(w) for w in words[1:]):
+            log.emit("gate_blocked", "hook", kind="read_scope", tool="Bash", command=cmd[:200])
+            return deny("Blocked by Glassbox: you may only read files inside this directory.")
+        return {}
+
+    async def observe(inp: dict[str, Any], tool_use_id: str | None, ctx: Any) -> dict:
+        cmd = inp.get("tool_input", {}).get("command", "")
+        if not target.is_observation(cmd):
+            return {}
+        resp = inp.get("tool_response") or {}
+        out = resp.get("stdout", "") if isinstance(resp, dict) else str(resp)
+        log.emit("observation", "hook", command=cmd[:300], output=out[:4000], truncated=len(out) > 4000,
+                 hypothesis_ids=state.armed(log.events))
+        return {}
+
     async def capture(inp: dict[str, Any], tool_use_id: str | None, ctx: Any) -> dict:
         cmd = inp.get("tool_input", {}).get("command", "")
         if not target.is_eval(cmd):
@@ -128,8 +170,9 @@ def build_hooks(log: EventLog, workdir: Path, target: Target) -> dict[str, list[
         return {}
 
     return {
-        "PreToolUse": [HookMatcher(matcher="Bash", hooks=[gate]),
+        "PreToolUse": [HookMatcher(matcher="Bash", hooks=[gate, read_guard]),
+                       HookMatcher(matcher="|".join(READ_TOOLS), hooks=[read_guard]),
                        HookMatcher(matcher="|".join(EDIT_TOOLS), hooks=[scope])],
-        "PostToolUse": [HookMatcher(matcher="Bash", hooks=[capture]),
+        "PostToolUse": [HookMatcher(matcher="Bash", hooks=[capture, observe]),
                         HookMatcher(matcher=".*", hooks=[trace])],
     }

@@ -1,0 +1,20 @@
+{
+  "name": "Rebuild a system from its runtime traces",
+  "description": "Only runtime traces of an unknown microservice system are available (no code, no docs). Reconstruct its services, call graph, call counts, parallelism, latencies and error behavior; scored against held-out traces the agent never sees.",
+  "metric": { "key": "score", "label": "reconstruction score", "short": "score", "unit": "/100", "direction": "higher" },
+  "breakdown": { "key": "breakdown", "label": "aspect" },
+  "editable": ["model.json"],
+  "copy": ["model.json", "traces.jsonl", "traces.py"],
+  "program": "program.md",
+  "allow": ["Bash(python3 traces.py:*)"],
+  "observe": { "match": "traces.py" },
+  "read_scope": "workdir",
+  "verify": { "mode": "heldout", "description": "scored against 60 held-out traces the agent never sees" },
+  "eval": {
+    "command": "{python} {target}/evaluate.py --workdir .",
+    "match": "evaluate.py",
+    "result_file": "result.json",
+    "correct_key": "valid",
+    "error_key": "error"
+  }
+}

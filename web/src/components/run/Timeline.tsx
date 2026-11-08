@@ -157,6 +157,11 @@ export function Timeline({
           {full.actions.map((a) => (
             <rect key={a.seq} x={x(a.seq)} y={TOP + CH + 30} width={1} height={10} fill="var(--color-cyan)" opacity={a.seq <= cursor ? 0.7 : 0.2} />
           ))}
+          {full.observations.map((o) => (
+            <rect key={`o${o.seq}`} x={x(o.seq) - 1} y={TOP + CH + 29} width={2.5} height={12} fill="var(--color-mint)" opacity={o.seq <= cursor ? 1 : 0.3}>
+              <title>observed: {o.command}</title>
+            </rect>
+          ))}
           {full.messages.map((m) => (
             <rect key={m.seq} x={x(m.seq)} y={TOP + CH + 30} width={1.5} height={10} fill="var(--color-violet)" opacity={m.seq <= cursor ? 0.9 : 0.25} />
           ))}
@@ -196,6 +201,7 @@ export function Timeline({
         <Legend color="var(--color-danger-fill)" label="refuted / invalid" />
 <Legend color="var(--color-cyan)" label={`best ${full.task.metric.label} (up = better)`} />
         <Legend color="var(--color-violet)" label="◇ agent message" />
+        <Legend color="var(--color-mint)" label="● observation (evidence looked at)" />
         <Legend color="var(--color-warn-fill)" label="gate blocked" />
       </div>
     </div>

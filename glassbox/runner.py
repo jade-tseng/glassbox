@@ -97,6 +97,7 @@ async def run(args: argparse.Namespace) -> None:
 
     allowed = TOOL_NAMES + ["Read", "Glob", "Grep", "Edit", "Write", "MultiEdit", f"Bash({target.eval_command})"]
     allowed += [f"Bash(git {c}:*)" for c in GIT_CMDS] + ["Bash(ls:*)", "Bash(cat:*)", "Bash(head:*)", "Bash(wc:*)"]
+    allowed += target.raw.get("allow", [])  # target-specific evidence tools, e.g. a trace query script
     options = ClaudeAgentOptions(
         cwd=str(work),
         model=args.model,
