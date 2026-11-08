@@ -201,6 +201,7 @@ export function buildGraph(events: GbEvent[], upToSeq: number = Number.POSITIVE_
   for (const ev of sorted) {
     if (ev.seq > upToSeq) break;
     state.seq = ev.seq;
+    if (ev.type !== "run_finished") state.finished = false; // a resumed run (e.g. model fallback) is running again
     state.t = ev.t;
 
     switch (ev.type) {

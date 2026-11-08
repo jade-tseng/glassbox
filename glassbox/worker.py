@@ -40,7 +40,7 @@ def retry(fn, attempts: int = 5):
 
 from .cases import CASES, build_target, dry_run, validate
 from .intake import interpret
-from .events import ROOT
+from .events import ROOT, EventLog
 
 WORKER = f"{socket.gethostname()}:{os.getpid()}"
 
@@ -93,6 +93,17 @@ def handle_dry_run(cases, doc) -> None:
     print(f"[worker] {doc['_id']}: dry run {'ok' if r['ok'] else 'FAILED'}: value={r.get('value')} error={r.get('error')}")
 
 
+def needs_fallback(run_id: str, rc: int) -> bool:
+    """The primary model failed: non-zero exit, an errored/interrupted finish, or no experiment recorded."""
+    path = ROOT / "runs" / run_id / "events.jsonl"
+    if rc != 0 or not path.exists():
+        return True
+    events = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    finished = [e for e in events if e["type"] == "run_finished"]
+    experiments = [e for e in events if e["type"] in ("experiment_run", "experiment_failed")]
+    return not finished or finished[-1].get("status") != "finished" or not experiments
+
+
 def handle_run(cases, doc) -> None:
     spec = doc["spec"]
     try:
@@ -110,9 +121,21 @@ def handle_run(cases, doc) -> None:
     if b.get("model"):
         cmd += ["--model", b["model"]]
     log = CASES / spec["id"] / f"{run_id}.log"
-    print(f"[worker] {doc['_id']}: starting {run_id} (log: {log})")
+    print(f"[worker] {doc['_id']}: starting {run_id} on {b.get('backend', 'anthropic')} {b.get('model', '')} (log: {log})")
     with log.open("w") as fh:
         rc = subprocess.run(cmd, cwd=ROOT, stdout=fh, stderr=subprocess.STDOUT).returncode
+    fb = b.get("fallback")
+    if fb and needs_fallback(run_id, rc):
+        # Resume the SAME run on the fallback model, so the UI keeps one continuous run.
+        EventLog(run_id).emit("agent_message", "system", text=(
+            f"[harness] {b.get('model')} ({b.get('backend')}) stopped early or failed; "
+            f"resuming this run on {fb['model']} ({fb['backend']})."))
+        print(f"[worker] {doc['_id']}: falling back to {fb['backend']} {fb['model']}")
+        resume = [sys.executable, "-m", "glassbox.runner", "--target", str(tdir), "--run-id", run_id, "--resume",
+                  "--backend", fb["backend"], "--model", fb["model"],
+                  "--max-experiments", str(b.get("max_experiments", 10)), "--budget-usd", str(b.get("budget_usd", 5))]
+        with log.open("a") as fh:
+            rc = subprocess.run(resume, cwd=ROOT, stdout=fh, stderr=subprocess.STDOUT).returncode
     tail = log.read_text()[-400:]
     set_status(cases, doc["_id"], status="finished" if rc == 0 else "failed", message=None if rc == 0 else tail)
     print(f"[worker] {doc['_id']}: {run_id} exited {rc}")
