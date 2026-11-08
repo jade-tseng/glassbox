@@ -3,7 +3,7 @@
 // What one hypothesis was and what it did, opened by clicking its dot in the belief flow.
 // Agent words are sans; harness numbers are mono (UI.md §9).
 
-import { fmtRows, isTension, type GraphState, type LinkRelation } from "@/lib/belief/engine";
+import { fmtMetric, isTension, type GraphState, type LinkRelation } from "@/lib/belief/engine";
 import { STATUS } from "./layout";
 
 const REL: Record<LinkRelation, string> = { refines: "builds on", depends_on: "builds on", contradicts: "conflicts with" };
@@ -67,7 +67,7 @@ export function HypothesisCard({ state, id, onClose }: { state: GraphState; id: 
                 <span style={{ color: STATUS.refutes }}>run failed ({e.errorKind})</span>
               ) : (
                 <>
-                  rows scanned {fmtRows(e.before)} → {fmtRows(e.after!)}{" "}
+                  {state.task.metric.label} {fmtMetric(e.before, state.task.metric)} → {fmtMetric(e.after!, state.task.metric)}{" "}
                   <span style={{ color: c }}>({pct! > 0 ? "+" : ""}{pct!.toFixed(1)}%)</span>
                 </>
               )}

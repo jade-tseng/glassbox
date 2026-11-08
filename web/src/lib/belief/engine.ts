@@ -79,7 +79,12 @@ export type Hypothesis = {
   history: { seq: number; t: number; belief: number }[];
 };
 
+export type MetricMeta = { label: string; unit: string; direction: "lower" | "higher" };
+export type TaskView = { name: string; description: string; agent: string; model: string; metric: MetricMeta };
+
 export type GraphState = {
+  task: TaskView;
+  finished: boolean;
   seq: number;
   t: number;
   topics: string[]; // in order of first appearance
@@ -101,7 +106,17 @@ export type GraphState = {
  */
 export function buildGraph(events: RunEvent[], upToSeq = Infinity): GraphState {
   const g = coreBuildGraph(events as unknown as GbEvent[], upToSeq);
+  const m = g.task.metric;
   const s: GraphState = {
+    task: {
+      name: g.task.name,
+      description: g.task.description,
+      agent: g.task.agent,
+      model: g.task.model,
+      // In prose we say "rows scanned" for ClickBench's read_rows (UI.md §9.10).
+      metric: { label: m.key === "total_read_rows" ? "rows scanned" : m.label, unit: m.unit === "rows" ? "" : m.unit, direction: m.direction },
+    },
+    finished: g.finished,
     seq: g.seq,
     t: g.t,
     topics: g.topics.map((t) => t.name),
@@ -112,13 +127,14 @@ export function buildGraph(events: RunEvent[], upToSeq = Infinity): GraphState {
     links: g.links.map((l) => ({ from: l.from, to: l.to, relation: l.relation })),
     gateBlocks: g.gateBlocks.map((b) => ({ seq: b.seq, t: b.t })),
     actions: g.actions.map((a) => ({ seq: a.seq, t: a.t, tool: a.tool })),
-    baseline: g.metric.baseline ?? 20_000_000,
-    best: g.metric.best ?? g.metric.baseline ?? 20_000_000,
+    baseline: g.metric.baseline ?? g.experiments[0]?.metricBefore ?? 0,
+    best: g.metric.best ?? g.metric.baseline ?? g.experiments[0]?.metricBefore ?? 0,
     newest: null,
   };
   const evidenceOf = new Map<string, EvidenceKind>();
   for (const e of g.evidence) evidenceOf.set(e.experiment, e.kind);
 
+  const better = (a: number, b: number) => (m.direction === "higher" ? Math.max(a, b) : Math.min(a, b));
   let best = s.baseline;
   for (const x of [...g.experiments].sort((a, b) => a.seq - b.seq)) {
     const failed = x.outcome === "invalid" && !!x.errorKind;
@@ -139,7 +155,7 @@ export function buildGraph(events: RunEvent[], upToSeq = Infinity): GraphState {
       files: x.filesChanged ?? [],
     };
     s.expOrder.push(x.id);
-    if (x.correct && x.metricAfter !== null) best = Math.min(best, x.metricAfter);
+    if (x.correct && x.metricAfter !== null) best = better(best, x.metricAfter);
   }
 
   const hyps = Object.values(g.hypotheses).sort((a, b) => a.proposedSeq - b.proposedSeq);
@@ -199,6 +215,14 @@ export function sameRegionPairs(hyps: Hypothesis[]) {
   return pairs;
 }
 
+/** A metric value for display: 20.0M, 759k, 0.0003 s. */
+export function fmtMetric(n: number | null | undefined, m?: MetricMeta) {
+  if (n === null || n === undefined || !Number.isFinite(n)) return "—";
+  const a = Math.abs(n);
+  const v = a >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : a >= 1e4 ? `${Math.round(n / 1e3)}k` : Number.isInteger(n) ? n.toLocaleString("en-US") : String(Number(n.toPrecision(3)));
+  return m?.unit ? `${v} ${m.unit}` : v;
+}
+
 export function fmtRows(n: number) {
   if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
   if (n >= 1e3) return `${Math.round(n / 1e3)}k`;
@@ -211,7 +235,7 @@ export function bestSoFar(s: GraphState): number[] {
   let best = s.baseline;
   for (const id of s.expOrder) {
     const e = s.experiments[id];
-    if (e.after !== null && e.correct) best = Math.min(best, e.after);
+    if (e.after !== null && e.correct) best = s.task.metric.direction === "higher" ? Math.max(best, e.after) : Math.min(best, e.after);
     out.push(best);
   }
   return out;

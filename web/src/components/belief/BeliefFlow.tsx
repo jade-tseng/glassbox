@@ -8,7 +8,7 @@
 // `mode="before"` collapses it into the plain keep/discard chart; experiment dots fly between the two.
 
 import { useMemo, type CSSProperties } from "react";
-import { beliefAt, bestSoFar, fmtRows, type Experiment, type Hypothesis, type LinkRelation } from "@/lib/belief/engine";
+import { beliefAt, bestSoFar, fmtMetric, type Experiment, type Hypothesis, type LinkRelation } from "@/lib/belief/engine";
 import { usePrefersReducedMotion } from "@/components/motion/useInView";
 import { HypothesisCard } from "./HypothesisCard";
 import { useReplay } from "./Replay";
@@ -57,6 +57,7 @@ export function BeliefFlow({
   topicFocus,
   pinned,
   onPin,
+  highlight = [],
 }: {
   mode: "beliefs" | "before";
   focus: string | null;
@@ -64,6 +65,7 @@ export function BeliefFlow({
   topicFocus: string | null;
   pinned: string | null;
   onPin: (id: string | null) => void;
+  highlight?: string[];
 }) {
   const { state, final } = useReplay();
   const reduced = usePrefersReducedMotion();
@@ -73,12 +75,27 @@ export function BeliefFlow({
   const sx = (t: number) => PAD.l + (t / T) * (W - PAD.l - PAD.r);
   const sy = (b: number) => PAD.t + (1 - b) * (H - PAD.t - PAD.b);
 
-  // Before-view scales: x = experiment index, y = log(rows scanned).
+  // Before-view scales: x = experiment index, y = the run's metric (log scale when it spans orders of magnitude).
+  const metric = final.task.metric;
   const N = final.expOrder.length;
-  const lo = Math.log10(final.best * 0.8);
-  const hi = Math.log10(final.baseline * 1.05);
+  const vals = [final.baseline, ...final.expOrder.map((id) => final.experiments[id].after ?? final.experiments[id].before)].filter(
+    (v) => Number.isFinite(v),
+  );
+  const vMin = Math.min(...vals, final.baseline || 1);
+  const vMax = Math.max(...vals, final.baseline || 1);
+  const useLog = vMin > 0 && vMax / vMin > 20;
+  const f = (v: number) => (useLog ? Math.log10(Math.max(v, 1e-12)) : v);
+  const lo = useLog ? f(vMin * 0.8) : vMin - (vMax - vMin) * 0.08;
+  const hi = useLog ? f(vMax * 1.05) : vMax + (vMax - vMin) * 0.08 || vMax + 1;
   const bx = (i: number) => PAD.l + (i / Math.max(1, N - 1)) * (W - PAD.l - PAD.r);
-  const by = (v: number) => H - PAD.b - ((Math.log10(v) - lo) / (hi - lo)) * (H - PAD.t - PAD.b);
+  const by = (v: number) => H - PAD.b - ((f(v) - lo) / (hi - lo || 1)) * (H - PAD.t - PAD.b);
+  // Gridlines: 1-2-5 steps per decade on a log scale, four even steps otherwise.
+  const ticks = useLog
+    ? Array.from({ length: 24 }, (_, i) => [1, 2, 5].map((k) => k * 10 ** (Math.floor(lo) + Math.floor(i / 1) - 0)))
+        .flat()
+        .filter((v, i, a) => a.indexOf(v) === i && f(v) >= lo && f(v) <= hi)
+        .filter((_, i, a) => a.length <= 6 || i % Math.ceil(a.length / 6) === 0)
+    : [0, 1, 2, 3].map((k) => vMin + ((vMax - vMin) * k) / 3);
 
   const hyps = state.order.map((id) => state.hypotheses[id]);
   const bests = bestSoFar(state);
@@ -109,7 +126,7 @@ export function BeliefFlow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
-  const lineage = useMemo(() => ((focus ?? pinned) ? lineageOf(state.links, (focus ?? pinned)!) : null), [focus, pinned, state.links]);
+  const lineage = useMemo(() => (focus ?? pinned) ? lineageOf(state.links, (focus ?? pinned)!) : highlight.length ? new Set(highlight) : null, [focus, pinned, state.links, highlight]);
   const lit = (h: Hypothesis) => {
     if (lineage) return lineage.has(h.id);
     if (topicFocus) return h.topic === topicFocus;
@@ -160,22 +177,22 @@ export function BeliefFlow({
         if (e.target === e.currentTarget) onPin(null);
       }}
       role="img"
-      aria-label={before ? "Keep/discard chart of rows scanned per experiment" : "Belief in each hypothesis over time, with links between related hypotheses"}
+      aria-label={before ? `Keep/discard chart of ${metric.label} per experiment` : "Belief in each hypothesis over time, with links between related hypotheses"}
       onMouseLeave={() => onFocus(null)}
     >
 
-      {/* ---- Before: rows scanned per experiment ---- */}
+      {/* ---- Before: the metric per experiment ---- */}
       <g style={fade(before)}>
-        {[final.baseline, 1e7, 3e6, 1e6].filter((v) => v >= final.best * 0.8).map((v) => (
+        {ticks.map((v) => (
           <g key={v}>
             <line x1={PAD.l} x2={W - PAD.r} y1={by(v)} y2={by(v)} stroke="rgba(230,234,236,.10)" strokeDasharray="2 4" />
             <text x={PAD.l - 10} y={by(v) + 4} textAnchor="end" className="font-mono" fontSize={11} fill="#8A949A">
-              {fmtRows(v)}
+              {fmtMetric(v)}
             </text>
           </g>
         ))}
         <text x={PAD.l} y={14} className="font-mono" fontSize={11} letterSpacing="0.08em" fill="#8A949A">
-          ROWS SCANNED (LOG) · PER EXPERIMENT
+          {metric.label.toUpperCase()}{useLog ? " (LOG)" : ""} · PER EXPERIMENT · {metric.direction === "lower" ? "LOWER" : "HIGHER"} IS BETTER
         </text>
         <text x={W - PAD.r} y={H - 8} textAnchor="end" className="font-mono" fontSize={11} letterSpacing="0.08em" fill="#8A949A">
           EXPERIMENTS →
@@ -313,7 +330,7 @@ export function BeliefFlow({
             }}
           >
             <title>
-              {`${e.id} · ${e.failed ? `failed (${e.errorKind})` : `rows scanned ${fmtRows(e.before)} → ${fmtRows(e.after ?? e.before)}`}${e.kept === null ? "" : e.kept ? " · kept" : " · discarded"}`}
+              {`${e.id} · ${e.failed ? `failed (${e.errorKind})` : `${metric.label} ${fmtMetric(e.before, metric)} → ${fmtMetric(e.after ?? e.before, metric)}`}${e.kept === null ? "" : e.kept ? " · kept" : " · discarded"}`}
             </title>
             <circle r={r} fill={fill} stroke={stroke} strokeWidth={1.2} style={{ transition: `r 600ms ${EASE_IO}` }} />
           </g>

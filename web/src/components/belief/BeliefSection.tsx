@@ -17,7 +17,15 @@ const TABS = [
 const AUTO_MORPH_MS = 3200;
 
 /** Opens on Before, then flies to Beliefs once on its own (unless the viewer picked a tab first). */
-export function BeliefSection() {
+export function BeliefSection({
+  highlight = [],
+  openRequest = null,
+}: {
+  /** Node ids to light up (e.g. cited by an answer); everything else dims. */
+  highlight?: string[];
+  /** Open this hypothesis's card (n changes on every request, so the same id can be reopened). */
+  openRequest?: { id: string; n: number } | null;
+} = {}) {
   const [mode, setMode] = useState<"before" | "beliefs">("before");
   const [touched, setTouched] = useState(false);
   const [focus, setFocus] = useState<string | null>(null);
@@ -39,6 +47,16 @@ export function BeliefSection() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [pinned]);
+
+  // A request from outside (an answer citing H7): switch to Beliefs and open its card.
+  // Adjusting state while rendering (guarded by the request number) avoids an extra effect pass.
+  const [handled, setHandled] = useState(0);
+  if (openRequest && openRequest.n !== handled) {
+    setHandled(openRequest.n);
+    setTouched(true);
+    setMode("beliefs");
+    setPinned(openRequest.id);
+  }
 
   const beliefs = mode === "beliefs";
 
@@ -77,6 +95,7 @@ export function BeliefSection() {
           focus={beliefs ? focus : null}
           onFocus={setFocus}
           topicFocus={null}
+          highlight={highlight}
           pinned={beliefs ? pinned : null}
           onPin={setPinned}
         />

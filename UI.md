@@ -363,7 +363,14 @@ Agents can now run research loops by themselves. What they leave behind is a sco
 | 1 | `Agent Archaeology.` + "mapping agents' belief system under uncertainty" + the main hypothesis in 2–3 sentences (top, scope). **Clicking the main hypothesis makes the same text editable in place** (`MainHypothesis.tsx`): same block, same size, a glass tint, text pre-selected, with access key · Map this → · Cancel underneath. A visitor rewrites it as a different scenario. It's sent to the same intake as /new, then continues on /new?case=<id>. | A real run opens on **Before** (the keep/discard chart), then flies to **Beliefs** on its own after ~3s. The inspector and timeline sit below it. |
 | 2 | `02 / Runs` | Every real run as a compact table linking to its run view, plus `Describe a problem →` (/new) and `All runs →` (/run). |
 | 3 | `03 / Impact` | Which ideas paid off, with one computed sentence per chart. |
-| 4 | `04 / Loop` | The orbit: predict → measure → update, with the gate at the center. |
+| 4 | `04 / Loop` · "From uncertainty to mapped hypotheses and updated beliefs." | The orbit: HYPOTHESIS → OBSERVED → INFERRED → UPDATED, with the GATE at the center drawn as a portal (an arch with the live light inside). |
+
+**Run page (`/run/<id>`)** tells one run the same way (`components/belief/RunStory.tsx`), fed live from `/api/events`:
+1. Status line (live / finished · agent (model) · duration · run id), the task name as the title, and the main hypothesis (the task's description).
+2. Three numbers: metric baseline → best (% change) · ideas (held up / dropped) · experiments.
+3. The same Before → Beliefs graph and click-for-card, following new events while the run is live.
+4. **Ask the run:** cited ideas light up in the graph, and clicking a citation opens its card.
+5. One link to **Full detail** (`/run/<id>/detail`, the dense view: ledger, heatmap, signals).
 
 *Removed from the landing page (Nov 7, evening): the hero copy and instrument, `00 / Context`, `01 / The run`, `05 / Why it matters`. Their copy below (§9.3–9.5, §9.9) stays as talk-track and run-view reference.*
 

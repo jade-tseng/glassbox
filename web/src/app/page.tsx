@@ -5,7 +5,7 @@ import Link from "next/link";
 import { BeliefSection } from "@/components/belief/BeliefSection";
 import { MainHypothesis } from "@/components/belief/MainHypothesis";
 import { ReplayProvider } from "@/components/belief/Replay";
-import { Calibration, CalibrationLead, HypothesisMarquee, ImpactLead, RegionImpact } from "@/components/belief/RunSummary";
+import { Calibration, CalibrationLead, ImpactLead, RegionImpact } from "@/components/belief/RunSummary";
 import { RunsPanel } from "@/components/belief/RunsPanel";
 import { GlassCube } from "@/components/motion/GlassCube";
 import { Orbit } from "@/components/motion/Orbit";
@@ -107,7 +107,7 @@ export default function Home() {
           <div className="mx-auto grid max-w-[1200px] grid-cols-[minmax(0,1fr)] items-center gap-10 md:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
             <Reveal>
               <SectionLabel n="04">Loop</SectionLabel>
-              <h2 className={`mt-4 ${h2}`}>No measurement without a prediction.</h2>
+              <h2 className={`mt-4 ${h2}`}>From uncertainty to mapped hypotheses and updated beliefs.</h2>
             </Reveal>
             <Reveal index={2}>
               <Orbit />
@@ -115,17 +115,12 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Every hypothesis the run considered */}
-        <div className="border-y border-line bg-frost py-4">
-          <HypothesisMarquee />
-        </div>
 
         <footer className="mt-auto bg-frost px-4 py-8 md:px-10">
           <div className={`mx-auto flex max-w-[1200px] items-center justify-between gap-4 ${label}`}>
             <span className="flex items-center gap-2 normal-case tracking-normal text-ink">
               <GlassCube size={14} /> glassbox
             </span>
-            <span className="text-right">Replay of a real Claude Code run · Nov 7, 2026</span>
           </div>
         </footer>
       </div>
