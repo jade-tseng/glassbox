@@ -45,12 +45,7 @@ export default function Home() {
             <h1 className="text-[32px] font-medium leading-[1.05] tracking-[-0.03em] md:text-[44px]">Agent Archaeology.</h1>
             <p className="mt-2 text-[16px] text-scope-muted md:text-[18px]">mapping agents&apos; belief system under uncertainty</p>
             <div className="mt-6 mb-8">
-              <MainHypothesis>
-                A web-analytics dashboard&apos;s 10 queries can return exactly the same results while scanning a small
-                fraction of the 20,000,000 rows they scan today. Claude Code may only change the table definition and
-                rewrite the queries; a fixed harness counts rows scanned and rejects any changed result. Over 25
-                experiments it got to −96%.
-              </MainHypothesis>
+              <MainHypothesis text="A web-analytics dashboard's 10 queries can return exactly the same results while scanning a small fraction of the 20,000,000 rows they scan today. Claude Code may only change the table definition and rewrite the queries; a fixed harness counts rows scanned and rejects any changed result. Over 25 experiments it got to −96%." />
             </div>
             <BeliefSection />
           </div>

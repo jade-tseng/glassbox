@@ -360,7 +360,7 @@ Agents can now run research loops by themselves. What they leave behind is a sco
 
 | # | Section | Job |
 |---|---|---|
-| 1 | `Agent Archaeology.` + "mapping agents' belief system under uncertainty" + the main hypothesis in 2–3 sentences (top, scope). **Clicking the main hypothesis opens a glass panel** (`MainHypothesis.tsx`) where a visitor describes a different scenario. It's sent to the same intake as /new, then continues on /new?case=<id>. | A real run opens on **Before** (the keep/discard chart), then flies to **Beliefs** on its own after ~3s. The inspector and timeline sit below it. |
+| 1 | `Agent Archaeology.` + "mapping agents' belief system under uncertainty" + the main hypothesis in 2–3 sentences (top, scope). **Clicking the main hypothesis makes the same text editable in place** (`MainHypothesis.tsx`): same block, same size, a glass tint, text pre-selected, with access key · Map this → · Cancel underneath. A visitor rewrites it as a different scenario. It's sent to the same intake as /new, then continues on /new?case=<id>. | A real run opens on **Before** (the keep/discard chart), then flies to **Beliefs** on its own after ~3s. The inspector and timeline sit below it. |
 | 2 | `02 / Runs` | Every real run as a compact table linking to its run view, plus `Describe a problem →` (/new) and `All runs →` (/run). |
 | 3 | `03 / Impact` | Which ideas paid off, with one computed sentence per chart. |
 | 4 | `04 / Loop` | The orbit: predict → measure → update, with the gate at the center. |
