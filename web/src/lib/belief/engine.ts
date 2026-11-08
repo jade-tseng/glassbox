@@ -55,6 +55,7 @@ export type Experiment = {
   kept: boolean | null; // agent's interpretation, once recorded
   note?: string;
   evidence: EvidenceKind;
+  files: string[];
 };
 
 export type Hypothesis = {
@@ -135,6 +136,7 @@ export function buildGraph(events: RunEvent[], upToSeq = Infinity): GraphState {
       kept: x.agentKept,
       note: x.note,
       evidence: evidenceOf.get(x.id) ?? "invalid",
+      files: x.filesChanged ?? [],
     };
     s.expOrder.push(x.id);
     if (x.correct && x.metricAfter !== null) best = Math.min(best, x.metricAfter);

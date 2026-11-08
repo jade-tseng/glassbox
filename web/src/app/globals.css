@@ -201,3 +201,12 @@ h1, h2, h3, h4 {
 @media (prefers-reduced-motion: reduce) {
   .anim-draw { animation: none; stroke-dasharray: none; }
 }
+
+/* Glass panel: rises in with a soft blur-to-sharp */
+@keyframes glass-in {
+  from { opacity: 0; transform: translateY(6px); filter: blur(2px); }
+}
+.anim-glass-in { animation: glass-in 280ms var(--ease-out) both; }
+@media (prefers-reduced-motion: reduce) {
+  .anim-glass-in { animation: none; }
+}

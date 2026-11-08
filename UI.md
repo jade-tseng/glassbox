@@ -276,8 +276,9 @@ The centerpiece: the run as a **connected graph over time** (`components/belief/
 - **Axes:** x = time in the run (minute ticks), y = belief (`refuted` 0 · `unsure` 0.5 · `certain` 1).
 - **Hypothesis = a short segment.** It starts at the agent's stated prediction (a hollow dot labeled `H#`), steps when its experiment lands, and ends with a mint ✓ at its final belief, or **falls to 0** in coral when refuted. An amber ✓ means "claimed, not shown". Segments are colored by topic. Ideas still open keep a faint dashed tail up to "now", so they don't dominate.
 - **Links connect lineages:** an arc from the parent hypothesis (its point at the child's start, or its end if it already closed) to the child's start. `refines` is a thin light line, `depends on` is a dotted cyan arrow, `contradicts` is a dashed coral line that is always labeled.
-- **Hover a hypothesis:** its lineage lights up (everything it builds on, plus the ideas built directly on it). The link labels appear ("H16 refines H12"), and the inspector shows its claim, reason, evidence and conclusion.
-- **Topic glossary** below the chart: each agent topic name with a plain-language gloss written by Glassbox ("projections: extra copies of the table, pre-sorted or pre-aggregated… more storage"). Hovering a topic dims the others.
+- **Hover a hypothesis:** its lineage lights up (everything it builds on, plus the ideas built directly on it), and the link labels appear ("H16 refines H12").
+- **Click a hypothesis:** a glass card opens next to its dot (`HypothesisCard.tsx`) showing **the idea** (the agent's claim), **what it did** (files changed, rows scanned before → after, kept or reverted, the agent's note), predicted → now, and its relations ("refines H12 · contradicted by H21"). Close it with ✕, Escape, or a click on empty canvas.
+- **No topic jargon on the page.** The agent's topic names (ordering key, projections…) only color the lines. They mean nothing to a visitor, so the card explains each idea in its own words instead.
 - **Before → Beliefs:** the same SVG. Experiment dots sit at (experiment #, rows scanned) in Before, and fly to (time, belief) on their hypothesis's segment in Beliefs. The view opens on Before and flies to Beliefs once, after about 3s.
 - **Replay bar:** play and scrub. Every view on the page reads the same position. The page opens on the finished run, paused.
 - **Data:** the landing page replays `bg3` (25 hypotheses, 23 explicit links), since lineage needs links.
@@ -358,7 +359,7 @@ Agents can now run research loops by themselves. What they leave behind is a sco
 
 | # | Section | Job |
 |---|---|---|
-| 1 | `Agent Archaeology.` + "From uncertainty to a mapped agent belief system" + the main hypothesis in 2–3 sentences (top, scope) | A real run opens on **Before** (the keep/discard chart), then flies to **Beliefs** on its own after ~3s. The inspector and timeline sit below it. |
+| 1 | `Agent Archaeology.` + "mapping agents' belief system under uncertainty" + the main hypothesis in 2–3 sentences (top, scope). **Clicking the main hypothesis opens a glass panel** (`MainHypothesis.tsx`) where a visitor describes a different scenario. It's sent to the same intake as /new, then continues on /new?case=<id>. | A real run opens on **Before** (the keep/discard chart), then flies to **Beliefs** on its own after ~3s. The inspector and timeline sit below it. |
 | 2 | `02 / Runs` | Every real run as a compact table linking to its run view, plus `Describe a problem →` (/new) and `All runs →` (/run). |
 | 3 | `03 / Impact` | Which ideas paid off, with one computed sentence per chart. |
 | 4 | `04 / Loop` | The orbit: predict → measure → update, with the gate at the center. |

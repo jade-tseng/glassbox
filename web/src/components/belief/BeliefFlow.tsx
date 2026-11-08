@@ -10,6 +10,7 @@
 import { useMemo, type CSSProperties } from "react";
 import { beliefAt, bestSoFar, fmtRows, isTension, type Experiment, type Hypothesis, type LinkRelation } from "@/lib/belief/engine";
 import { usePrefersReducedMotion } from "@/components/motion/useInView";
+import { HypothesisCard } from "./HypothesisCard";
 import { useReplay } from "./Replay";
 import { STATUS, TOPIC_TEXT } from "./layout";
 
@@ -53,11 +54,15 @@ export function BeliefFlow({
   focus,
   onFocus,
   topicFocus,
+  pinned,
+  onPin,
 }: {
   mode: "beliefs" | "before";
   focus: string | null;
   onFocus: (id: string | null) => void;
   topicFocus: string | null;
+  pinned: string | null;
+  onPin: (id: string | null) => void;
 }) {
   const { state, final } = useReplay();
   const reduced = usePrefersReducedMotion();
@@ -103,7 +108,7 @@ export function BeliefFlow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
-  const lineage = useMemo(() => (focus ? lineageOf(state.links, focus) : null), [focus, state.links]);
+  const lineage = useMemo(() => ((focus ?? pinned) ? lineageOf(state.links, (focus ?? pinned)!) : null), [focus, pinned, state.links]);
   const lit = (h: Hypothesis) => {
     if (lineage) return lineage.has(h.id);
     if (topicFocus) return h.topic === topicFocus;
@@ -143,10 +148,16 @@ export function BeliefFlow({
 
   const minutes = Array.from({ length: Math.floor(T / 60) + 1 }, (_, m) => m * 60).filter((t) => t > 0);
 
+  const pin = pinned && !before && seg[pinned] && state.hypotheses[pinned] ? { id: pinned, x: sx(seg[pinned].t0), y: sy(state.hypotheses[pinned].prior) } : null;
+
   return (
+    <div className="relative min-w-[760px]">
     <svg
       viewBox={`0 0 ${W} ${H}`}
-      className="block w-full min-w-[760px]"
+      className="block w-full"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onPin(null);
+      }}
       role="img"
       aria-label={before ? "Keep/discard chart of rows scanned per experiment" : "Belief in each hypothesis over time, with links between related hypotheses"}
       onMouseLeave={() => onFocus(null)}
@@ -237,7 +248,11 @@ export function BeliefFlow({
               aria-label={`${h.id} ${h.status}: ${h.claim}`}
               onMouseEnter={() => onFocus(h.id)}
               onFocus={() => onFocus(h.id)}
-              onClick={() => onFocus(h.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onFocus(h.id);
+                onPin(h.id);
+              }}
               className="cursor-pointer outline-none"
               style={{ opacity: on ? (s.dead ? 0.7 : 1) : 0.12, transition: `opacity 280ms ${EASE}` }}
             >
@@ -247,7 +262,7 @@ export function BeliefFlow({
                 d={s.d}
                 fill="none"
                 stroke={s.dead ? STATUS.refutes : color}
-                strokeWidth={focus === h.id ? 3 : 2}
+                strokeWidth={focus === h.id || pinned === h.id ? 3 : 2}
                 strokeLinecap="round"
                 pathLength={1}
                 className={reduced ? undefined : "anim-draw"}
@@ -305,5 +320,17 @@ export function BeliefFlow({
         );
       })}
     </svg>
+    {pin && (
+      <div
+        className="absolute z-20"
+        style={{
+          ...(pin.x / W > 0.55 ? { right: `${(1 - pin.x / W) * 100 + 1.2}%` } : { left: `${(pin.x / W) * 100 + 1.2}%` }),
+          ...(pin.y / H > 0.5 ? { bottom: `${(1 - pin.y / H) * 100 - 4}%` } : { top: `${(pin.y / H) * 100 - 4}%` }),
+        }}
+      >
+        <HypothesisCard state={state} id={pin.id} onClose={() => onPin(null)} />
+      </div>
+    )}
+    </div>
   );
 }
