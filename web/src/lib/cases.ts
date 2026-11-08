@@ -16,6 +16,8 @@ export type CaseSpec = {
   metric: { label: string; unit?: string; direction: "lower" | "higher" };
   verify: { mode: VerifyMode; key?: string; command?: string };
   budget: { max_experiments: number; backend: "anthropic" | "meta"; model?: string; budget_usd?: number };
+  evidence?: { commands?: string[]; description?: string }; // read-only commands to look at evidence (-> observations)
+  hidden?: string[]; // top-level files kept out of the agent's copy (held-out data, the scorer)
 };
 
 export type CaseStatus =

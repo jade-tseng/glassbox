@@ -12,12 +12,14 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import subprocess
 from pathlib import Path
 from typing import Any
 
 from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, TextBlock, query
 
 from .cases import CASES, validate
+from .events import ROOT
 
 DEFAULT_BUDGET = {"max_experiments": 10, "backend": "anthropic", "model": "sonnet", "budget_usd": 5}
 
@@ -34,8 +36,14 @@ Case spec (JSON):
               "timeout_s": 300},
   "metric": {"label": "what the number is", "unit": "s / ms / % / ...", "direction": "lower" | "higher"},
   "verify": {"mode": "test_command" | "json_flag" | "same_output" | "none", "command": "...", "key": "..."},
-  "budget": {"max_experiments": 10, "backend": "anthropic" | "meta", "model": "sonnet", "budget_usd": 5}
+  "budget": {"max_experiments": 10, "backend": "anthropic" | "meta", "model": "sonnet", "budget_usd": 5},
+  "evidence": {"commands": ["python3 traces.py"], "description": "what the agent can look at"},   # optional
+  "hidden": ["heldout/", "evaluate.py"]                                                           # optional
 }
+evidence (optional): read-only commands the agent may run to LOOK at evidence (trace/log queries, probes of a black
+box). Their outputs are recorded verbatim as observations. Use when the task is to understand or reconstruct something.
+hidden (optional): top-level files/folders kept OUT of the agent's copy (held-out data, the scorer). If the measure
+command needs them, call them by their ABSOLUTE path inside the workspace (the agent's copy won't contain them).
 verify modes: test_command = a command that must exit 0 (e.g. pytest); json_flag = the measure output's JSON has a
 true flag (key); same_output = a command whose output must stay identical to the baseline's; none = no check.
 
@@ -43,7 +51,13 @@ How to work:
 - If a workspace path is given, look inside it (read-only: list files, read the benchmark/tests/README) to fill in
   details yourself: the measure command, how its output looks (pick the parse mode that matches), which files hold
   the logic (editable), and whether tests exist. Prefer facts from the code over guesses.
-- Never invent a workspace path. If none is given, ask for it.
+- Never invent a workspace path. If none is given, ask for it. (A GitHub URL is cloned for you; its local path is
+  given as "Workspace detected".)
+- If there is no benchmark script, propose a measure command built from what exists (e.g.
+  `python3 -m timeit -s "from pkg import f" "f(...)"` with parse last_number, or a test run's timing), and ask the
+  user to confirm it. Prefer the repo's own tests for verification (e.g. `python3 -m pytest -q`).
+- If held-out data or a scorer is present, put them in "hidden" and reference them by absolute path in the
+  measure command; if an evidence tool is present (e.g. a trace query script), list it in "evidence".
 - VERIFICATION IS REQUIRED TO BE EXPLICIT: unless the user clearly said how correctness is checked (or said there
   is none), ask them to confirm, and put your best proposal in "suggestion" (e.g. the test command you found).
 - Ask at most 3 questions, short and concrete, each with a suggested answer when you have one. Don't ask about
@@ -56,12 +70,34 @@ Finish with ONLY this JSON in a ```json fenced block:
  "questions": [{"field": "verify", "question": "...", "suggestion": "..."}]}
 """
 
-ABS_PATH = re.compile(r"(?<![\w.])(/(?:[\w.@+-]+/)*[\w.@+-]+)")
+ABS_PATH = re.compile(r"(?<![\w.:/])(/(?:[\w.@+-]+/)*[\w.@+-]+)")
+GIT_URL = re.compile(r"https?://(?:www\.)?(github\.com|gitlab\.com|bitbucket\.org)/([\w.-]+)/([\w.-]+?)(?:\.git)?(?=[/\s)#?]|$)")
+WORKSPACES = ROOT / "workspaces"
+
+
+def clone_repo(conversation: list[dict[str, str]]) -> Path | None:
+    """A public repo URL in the conversation -> shallow clone under workspaces/ (reused if already cloned)."""
+    for msg in reversed(conversation):
+        if msg.get("role") != "user":
+            continue
+        m = GIT_URL.search(msg.get("text", ""))
+        if not m:
+            continue
+        host, owner, repo = m.groups()
+        dest = WORKSPACES / f"{owner}-{repo}".lower()
+        if not (dest / ".git").exists():
+            WORKSPACES.mkdir(parents=True, exist_ok=True)
+            subprocess.run(["git", "clone", "--depth", "1", f"https://{host}/{owner}/{repo}.git", str(dest)],
+                           check=True, capture_output=True, text=True, timeout=300)
+        return dest
+    return None
 
 
 def find_workspace(conversation: list[dict[str, str]], spec: dict[str, Any] | None) -> Path | None:
     if spec and (p := (spec.get("workspace") or {}).get("path")) and Path(p).is_dir():
         return Path(p)
+    if repo := clone_repo(conversation):
+        return repo
     for msg in reversed(conversation):
         if msg.get("role") != "user":
             continue
@@ -120,6 +156,8 @@ def interpret(case_id: str | None, conversation: list[dict[str, str]], spec: dic
     ws = find_workspace(conversation, spec)
     scratch = CASES / "_intake"
     scratch.mkdir(parents=True, exist_ok=True)
+    if ws and not (spec or {}).get("workspace"):
+        spec = {**(spec or {}), "workspace": {"path": str(ws)}}
     prompt = (f"{INSTRUCTIONS}\n\nWorkspace detected: {ws if ws else 'none given yet'}\n\n"
               f"CONVERSATION:\n{transcript(conversation, spec)}")
     text = asyncio.run(_run_agent(prompt, ws or scratch, model))

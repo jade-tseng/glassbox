@@ -198,6 +198,21 @@ export default function NewCasePage() {
                 {spec.verify?.mode === "none" && <span className="text-warning">no correctness check (results will be unverified)</span>}
                 {!spec.verify?.mode && <Missing />}
               </Row>
+              {(spec.evidence?.commands?.length ?? 0) > 0 && (
+                <Row k="Can look at">
+                  {spec.evidence!.commands!.map((c) => (
+                    <code key={c} className="mr-2 font-mono text-[13px]">
+                      {c}
+                    </code>
+                  ))}
+                  <span className="text-muted">· every output is recorded as an observation</span>
+                </Row>
+              )}
+              {(spec.hidden?.length ?? 0) > 0 && (
+                <Row k="Hidden">
+                  {spec.hidden!.join(", ")} <span className="text-muted">· kept out of the agent&apos;s copy</span>
+                </Row>
+              )}
               <Row k="Budget">
                 {spec.budget?.max_experiments} experiments · {spec.budget?.backend} {spec.budget?.model} · max ${spec.budget?.budget_usd}
               </Row>

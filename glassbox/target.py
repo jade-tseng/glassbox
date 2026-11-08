@@ -61,7 +61,8 @@ class Target:
     def is_observation(self, cmd: str) -> bool:
         """Commands whose output is evidence about the system (recorded as observation events)."""
         m = (self.raw.get("observe") or {}).get("match")
-        return bool(m) and m in cmd and not self.is_eval(cmd)
+        matches = [m] if isinstance(m, str) else (m or [])
+        return any(x and x in cmd for x in matches) and not self.is_eval(cmd)
 
     def better(self, a: float | None, b: float | None) -> bool:
         """Is a strictly better than b?"""

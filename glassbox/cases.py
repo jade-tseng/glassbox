@@ -62,6 +62,11 @@ def validate(spec: dict[str, Any]) -> list[str]:
         errs.append("measure.parse.mode must be json_key, regex or last_number")
     if (spec.get("metric") or {}).get("direction") not in ("lower", "higher"):
         errs.append("metric.direction must be lower or higher")
+    ev = spec.get("evidence") or {}
+    if ev and not isinstance(ev.get("commands", []), list):
+        errs.append("evidence.commands must be a list of commands")
+    if not isinstance(spec.get("hidden", []), list):
+        errs.append("hidden must be a list of top-level files or folders")
     v = spec.get("verify") or {}
     if v.get("mode") not in VERIFY_TEXT:
         errs.append("verify.mode must be json_flag, test_command, same_output or none")
@@ -113,7 +118,8 @@ def build_target(spec: dict[str, Any]) -> Path:
     tdir.mkdir(parents=True)
     ws = Path(spec["workspace"]["path"])
     # Names Glassbox generates are never linked (writing them must not touch the user's workspace).
-    entries = sorted(p.name for p in ws.iterdir() if p.name not in SKIP and p.name not in RESERVED)
+    hidden = {h.strip("/") for h in spec.get("hidden", [])}
+    entries = sorted(p.name for p in ws.iterdir() if p.name not in SKIP and p.name not in RESERVED and p.name not in hidden)
     for name in entries:  # the runner copies these into each run's fresh git workdir
         (tdir / name).symlink_to(ws / name)
     case_file = CASES / spec["id"] / "case.json"
@@ -130,6 +136,9 @@ def build_target(spec: dict[str, Any]) -> Path:
         "copy": [e for e in entries if e not in ("program.md",)],
         "program": "program.md",
         "verify": spec["verify"],
+        "allow": [f"Bash({c}:*)" for c in (spec.get("evidence") or {}).get("commands", [])],
+        "observe": {"match": [c.split()[-1] if c.split() else c for c in (spec.get("evidence") or {}).get("commands", [])]},
+        "hidden": sorted(hidden),
         "eval": {
             "command": f"{{python}} {ADAPTER} --case {case_file} --workdir . --out ../result.json",
             "match": "adapter.py",
@@ -157,7 +166,8 @@ def dry_run(spec: dict[str, Any]) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="glassbox-dry-") as tmp:
         run_dir = Path(tmp)
         work = run_dir / "work"
-        shutil.copytree(spec["workspace"]["path"], work, ignore=shutil.ignore_patterns(*SKIP))
+        hidden = [h.strip("/") for h in spec.get("hidden", [])]
+        shutil.copytree(spec["workspace"]["path"], work, ignore=shutil.ignore_patterns(*SKIP, *hidden))
         r = evaluate(spec, work, run_dir / "result.json")
         if r["correct"] and spec["verify"]["mode"] == "same_output":  # second pass proves the check is stable
             r2 = evaluate(spec, work, run_dir / "result.json")

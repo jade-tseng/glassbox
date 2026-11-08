@@ -23,3 +23,6 @@ __pycache__/
 
 # Generated case targets (from /new wizard specs)
 /cases/
+
+# Repos cloned for cases (from GitHub URLs typed in /new)
+/workspaces/
