@@ -10,7 +10,8 @@ import type { RunSummary } from "@/lib/runSummary";
 const pct = (x: number | null, dir: "lower" | "higher") =>
   x === null ? "—" : `${(dir === "lower") === x >= 0 ? "−" : "+"}${Math.abs(x * 100).toFixed(1)}%`;
 
-export function RunsPanel({ limit = 6 }: { limit?: number }) {
+/** `pinned`: the run replayed at the top of the page; always listed first, then the newest others. */
+export function RunsPanel({ limit = 6, pinned = "bg3" }: { limit?: number; pinned?: string }) {
   const [runs, setRuns] = useState<RunSummary[] | null>(null);
   const [error, setError] = useState(false);
 
@@ -43,7 +44,8 @@ export function RunsPanel({ limit = 6 }: { limit?: number }) {
         </div>
       )}
       {error && <p className="p-4 font-mono text-[12px] text-muted">Runs are unavailable right now.</p>}
-      {runs?.slice(0, limit).map((r) => {
+      {runs &&
+        [...runs.filter((r) => r.runId === pinned), ...runs.filter((r) => r.runId !== pinned)].slice(0, limit).map((r) => {
         const alerts = r.signals.filter((s) => s.level !== "info").length;
         const live = r.status === "running";
         return (
@@ -56,6 +58,11 @@ export function RunsPanel({ limit = 6 }: { limit?: number }) {
               {live && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-live" aria-label="live" />}
               <span className="truncate text-[14px]">{r.task || r.runId}</span>
               <span className="hidden shrink-0 font-mono text-[11px] text-muted sm:inline">{r.runId}</span>
+              {r.runId === pinned && (
+                <span className="shrink-0 rounded-[3px] border border-line px-1.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
+                  shown above
+                </span>
+              )}
             </span>
             <span className="truncate font-mono text-[12px] text-muted md:order-none">{r.model}</span>
             <span className="whitespace-nowrap text-right font-mono text-[12px] tabular-nums">
