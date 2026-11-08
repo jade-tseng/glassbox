@@ -82,23 +82,32 @@ export function BeliefSection() {
         />
       </div>
       <ReplayBar />
-      <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-2 font-mono text-[11px] uppercase tracking-[0.08em] text-scope-muted">
-        <li className="flex items-center gap-2">
-          <svg width="10" height="10" aria-hidden><circle cx="5" cy="5" r="3.5" fill="#0E1114" stroke="#E6EAEC" strokeWidth={1.4} /></svg>
-          predicted
-        </li>
-        <li className="flex items-center gap-2"><Mark fill={STATUS.supports} /> confirmed</li>
-        <li className="flex items-center gap-2"><Mark fill={STATUS.refutes} /> refuted → 0</li>
-        <li className="flex items-center gap-2"><Mark fill={STATUS.amber} /> claimed, not shown</li>
-        <li className="flex items-center gap-2">
-          <svg width="22" height="8" aria-hidden><line x1="0" y1="4" x2="22" y2="4" stroke="rgba(230,234,236,.5)" /></svg> refines
-        </li>
-        <li className="flex items-center gap-2">
-          <svg width="22" height="8" aria-hidden><line x1="0" y1="4" x2="22" y2="4" stroke="#7FD6E4" strokeDasharray="1 3" /></svg> depends on
-        </li>
-        <li className="flex items-center gap-2">
-          <svg width="22" height="8" aria-hidden><line x1="0" y1="4" x2="22" y2="4" stroke={STATUS.refutes} strokeDasharray="4 3" /></svg> contradicts
-        </li>
+      {/* Legend: a handful of plain marks, per view */}
+      <ul className="mt-4 flex flex-wrap gap-x-6 gap-y-2 font-mono text-[11px] uppercase tracking-[0.08em] text-scope-muted">
+        {beliefs ? (
+          <>
+            <li className="flex items-center gap-2">
+              <svg width="10" height="10" aria-hidden><circle cx="5" cy="5" r="3.5" fill="#0E1114" stroke="#E6EAEC" strokeWidth={1.4} /></svg>
+              prediction
+            </li>
+            <li className="flex items-center gap-2"><Mark fill={STATUS.supports} /> held up</li>
+            <li className="flex items-center gap-2"><Mark fill={STATUS.refutes} /> dropped → 0</li>
+            <li className="flex items-center gap-2">
+              <svg width="22" height="8" aria-hidden><line x1="0" y1="4" x2="22" y2="4" stroke="rgba(230,234,236,.5)" /></svg> builds on
+            </li>
+            <li className="flex items-center gap-2">
+              <svg width="22" height="8" aria-hidden><line x1="0" y1="4" x2="22" y2="4" stroke={STATUS.refutes} strokeDasharray="4 3" /></svg> conflicts with
+            </li>
+          </>
+        ) : (
+          <>
+            <li className="flex items-center gap-2"><Mark fill={STATUS.supports} /> change kept</li>
+            <li className="flex items-center gap-2">
+              <svg width="10" height="10" aria-hidden><circle cx="5" cy="5" r="3.5" fill="#0E1114" stroke="#7C8B98" strokeWidth={1.4} /></svg>
+              change reverted
+            </li>
+          </>
+        )}
       </ul>
     </div>
   );

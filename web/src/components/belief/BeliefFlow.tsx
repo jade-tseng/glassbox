@@ -8,11 +8,11 @@
 // `mode="before"` collapses it into the plain keep/discard chart; experiment dots fly between the two.
 
 import { useMemo, type CSSProperties } from "react";
-import { beliefAt, bestSoFar, fmtRows, isTension, type Experiment, type Hypothesis, type LinkRelation } from "@/lib/belief/engine";
+import { beliefAt, bestSoFar, fmtRows, type Experiment, type Hypothesis, type LinkRelation } from "@/lib/belief/engine";
 import { usePrefersReducedMotion } from "@/components/motion/useInView";
 import { HypothesisCard } from "./HypothesisCard";
 import { useReplay } from "./Replay";
-import { STATUS, TOPIC_TEXT } from "./layout";
+import { STATUS } from "./layout";
 
 const W = 1100;
 const H = 400;
@@ -21,16 +21,17 @@ const EASE = "cubic-bezier(.2,.8,.2,1)";
 const EASE_IO = "cubic-bezier(.65,0,.35,1)";
 const MIN_SEG_S = 6; // a hypothesis proposed and closed in the same second still gets a visible segment
 
+// Two kinds of link only: an idea builds on an earlier one (refines / depends on), or conflicts with it.
 const LINK_STYLE: Record<LinkRelation, { stroke: string; dash?: string; label: string }> = {
-  refines: { stroke: "rgba(230,234,236,.38)", label: "refines" },
-  depends_on: { stroke: "#7FD6E4", dash: "1 3", label: "depends on" },
-  contradicts: { stroke: STATUS.refutes, dash: "4 3", label: "contradicts" },
+  refines: { stroke: "rgba(230,234,236,.38)", label: "builds on" },
+  depends_on: { stroke: "rgba(230,234,236,.38)", label: "builds on" },
+  contradicts: { stroke: STATUS.refutes, dash: "4 3", label: "conflicts with" },
 };
 
-export function topicStroke(topics: string[], topic: string) {
-  const i = Math.max(0, topics.indexOf(topic));
-  return TOPIC_TEXT[i % TOPIC_TEXT.length];
-}
+// Lines are colored by outcome, not by topic: held up, dropped, or still open.
+const OPEN = "#C9CFD3";
+const outcomeColor = (h: Hypothesis) =>
+  h.status === "confirmed" ? STATUS.supports : h.status === "refuted" || h.status === "abandoned" ? STATUS.refutes : OPEN;
 
 /** The chain behind a hypothesis: everything it builds on (recursively), plus the ideas that build directly on it. */
 function lineageOf(links: { from: string; to: string }[], id: string) {
@@ -162,11 +163,6 @@ export function BeliefFlow({
       aria-label={before ? "Keep/discard chart of rows scanned per experiment" : "Belief in each hypothesis over time, with links between related hypotheses"}
       onMouseLeave={() => onFocus(null)}
     >
-      <defs>
-        <marker id="arrow-dep" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="6" markerHeight="6" orient="auto">
-          <path d="M0,0 L6,3 L0,6 z" fill="#7FD6E4" />
-        </marker>
-      </defs>
 
       {/* ---- Before: rows scanned per experiment ---- */}
       <g style={fade(before)}>
@@ -220,12 +216,11 @@ export function BeliefFlow({
                 d={l.d}
                 fill="none"
                 stroke={st.stroke}
-                strokeWidth={l.rel === "refines" ? 1 : 1.3}
+                strokeWidth={l.rel === "contradicts" ? 1.3 : 1}
                 strokeDasharray={st.dash}
-                markerEnd={l.rel === "depends_on" ? "url(#arrow-dep)" : undefined}
               />
               {show && (
-                <text x={l.mid.x + 6} y={l.mid.y - 4} className="font-mono" fontSize={10} fill={st.stroke === LINK_STYLE.refines.stroke ? "#C9CFD3" : st.stroke}>
+                <text x={l.mid.x + 6} y={l.mid.y - 4} className="font-mono" fontSize={10} fill={l.rel === "contradicts" ? st.stroke : "#C9CFD3"}>
                   {l.child.id} {st.label} {l.parent.id}
                 </text>
               )}
@@ -236,10 +231,9 @@ export function BeliefFlow({
         {/* Hypothesis segments */}
         {hyps.map((h) => {
           const s = seg[h.id];
-          const color = topicStroke(final.topics, h.topic);
+          const color = outcomeColor(h);
           const on = lit(h);
           const isNew = state.newest === h.id || h.experiments.includes(state.newest ?? "");
-          const tension = isTension(h, state.experiments);
           return (
             <g
               key={h.id}
@@ -261,7 +255,7 @@ export function BeliefFlow({
               <path
                 d={s.d}
                 fill="none"
-                stroke={s.dead ? STATUS.refutes : color}
+                stroke={color}
                 strokeWidth={focus === h.id || pinned === h.id ? 3 : 2}
                 strokeLinecap="round"
                 pathLength={1}
@@ -273,23 +267,29 @@ export function BeliefFlow({
                 {h.id}
               </text>
               {/* outcome */}
-              {s.dead ? (
-                <g transform={`translate(${s.end.x},${s.end.y})`}>
-                  <circle r={5} fill={STATUS.refutes} />
-                  <path d="M-2.2,-2.2 L2.2,2.2 M2.2,-2.2 L-2.2,2.2" stroke="#0E1114" strokeWidth={1.4} />
-                </g>
-              ) : h.status === "confirmed" ? (
-                <g transform={`translate(${s.end.x},${s.end.y})`}>
-                  <circle r={5} fill={tension ? STATUS.amber : STATUS.supports} />
-                  <path d="M-2.4,0.2 L-0.6,2 L2.6,-1.8" fill="none" stroke="#0E1114" strokeWidth={1.4} />
-                </g>
-              ) : (
-                <circle cx={s.end.x} cy={s.end.y} r={3} fill={color} />
-              )}
+              <circle cx={s.end.x} cy={s.end.y} r={s.open ? 3 : 5} fill={color} />
               {isNew && !reduced && <circle key={`ring-${state.seq}`} cx={s.end.x} cy={s.end.y} r={5} fill="none" stroke={STATUS.live} className="anim-ring" />}
             </g>
           );
         })}
+        {/* Hover: one line saying what the idea is (click for the full card) */}
+        {focus && !pinned && seg[focus] && state.hypotheses[focus] && (() => {
+          const h = state.hypotheses[focus];
+          const x0 = sx(seg[focus].t0);
+          const y0 = sy(h.history[0]?.belief ?? h.prior);
+          const text = `${h.id} · ${h.claim.length > 72 ? `${h.claim.slice(0, 71)}…` : h.claim}`;
+          const w = text.length * 6.4 + 16;
+          const x = Math.min(Math.max(x0 - w / 2, PAD.l), W - PAD.r - w);
+          const y = y0 < 70 ? y0 + 14 : y0 - 40;
+          return (
+            <g pointerEvents="none">
+              <rect x={x} y={y} width={w} height={22} rx={4} fill="#161A1E" stroke="rgba(230,234,236,.18)" />
+              <text x={x + 8} y={y + 15} className="font-mono" fontSize={11} fill="#E6EAEC">
+                {text}
+              </text>
+            </g>
+          );
+        })()}
       </g>
 
       {/* ---- Experiment dots: shared by both views, they fly between them ---- */}
@@ -300,8 +300,8 @@ export function BeliefFlow({
         const h = state.hypotheses[e.hypothesisIds[0]];
         const dim = !before && h ? !lit(h) : false;
         const bad = e.failed || !e.correct;
-        const fill = bad ? STATUS.refutes : e.kept === true ? STATUS.supports : e.kept === false ? "#0E1114" : "#E6EAEC";
-        const stroke = bad ? STATUS.refutes : e.kept === false ? "#7C8B98" : fill;
+        const fill = !before ? "#E6EAEC" : bad ? STATUS.refutes : e.kept === true ? STATUS.supports : e.kept === false ? "#0E1114" : "#E6EAEC";
+        const stroke = !before ? "#E6EAEC" : bad ? STATUS.refutes : e.kept === false ? "#7C8B98" : fill;
         const r = before ? 5 : 2.5;
         return (
           <g

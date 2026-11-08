@@ -6,8 +6,9 @@
 import { fmtRows, isTension, type GraphState, type LinkRelation } from "@/lib/belief/engine";
 import { STATUS } from "./layout";
 
-const REL: Record<LinkRelation, string> = { refines: "refines", depends_on: "depends on", contradicts: "contradicts" };
-const REL_BY: Record<LinkRelation, string> = { refines: "refined by", depends_on: "needed by", contradicts: "contradicted by" };
+const REL: Record<LinkRelation, string> = { refines: "builds on", depends_on: "builds on", contradicts: "conflicts with" };
+const REL_BY: Record<LinkRelation, string> = { refines: "built on by", depends_on: "built on by", contradicts: "conflicts with" };
+const STATUS_WORD: Record<string, string> = { open: "still open", confirmed: "held up", refuted: "dropped", abandoned: "dropped" };
 const STATUS_CHIP: Record<string, string> = {
   open: "border-scope-line text-scope-text",
   confirmed: "border-transparent bg-mint text-ink",
@@ -39,7 +40,7 @@ export function HypothesisCard({ state, id, onClose }: { state: GraphState; id: 
     >
       <div className="flex items-center gap-2 font-mono text-[12px] uppercase tracking-[0.08em]">
         <span>{id}</span>
-        <span className={`rounded-[3px] border px-1.5 py-px text-[11px] ${STATUS_CHIP[h.status]}`}>{h.status}</span>
+        <span className={`rounded-[3px] border px-1.5 py-px text-[11px] ${STATUS_CHIP[h.status]}`}>{STATUS_WORD[h.status] ?? h.status}</span>
         <button type="button" onClick={onClose} className="ml-auto text-[14px] text-scope-muted hover:text-scope-text" aria-label="Close">
           ✕
         </button>
@@ -91,7 +92,7 @@ export function HypothesisCard({ state, id, onClose }: { state: GraphState; id: 
       )}
 
       {tension && (
-        <p className="mt-3 text-[12px] text-warn-fill">Claimed, not shown: marked confirmed, but the measurements don&apos;t back it.</p>
+        <p className="mt-3 text-[12px] text-warn-fill">The agent called this a success, but the measurements barely back it.</p>
       )}
     </div>
   );
